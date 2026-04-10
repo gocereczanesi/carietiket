@@ -3,13 +3,11 @@ import streamlit.components.v1 as components
 import google.generativeai as genai
 from PIL import Image
 
-# Sayfa Ayarları
 st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="centered")
 
 st.title("💊 Eczane Akıllı Hesap Dökümü")
 st.markdown("Otomasyon metnini yapıştırın veya **reçete/cari görselini (JPG, PNG, PDF)** yükleyin.")
 
-# API Key Kontrolü
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
@@ -17,7 +15,6 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# Onayladığın Tasarım Şablonu (Kilitlendi, Bozulmuyor)
 TEMPLATE_HTML = """
 <!DOCTYPE html>
 <html lang="tr">
@@ -48,7 +45,6 @@ TEMPLATE_HTML = """
 </html>
 """
 
-# Sekmeler (Metin Girişi vs Dosya Yükleme)
 tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Dosya/Fotoğraf Yükle"])
 
 with tab1:
@@ -67,14 +63,12 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
     
     if uploaded_file:
         if "pdf" in uploaded_file.type:
-            # PDF ise metin okuyucuya PDF formatında gönder
             content_to_send.append({
                 "mime_type": "application/pdf",
                 "data": uploaded_file.getvalue()
             })
             prompt_intro = "Bu PDF dosyasındaki eczane cari dökümünü incele."
         else:
-            # Görsel ise fotoğraf olarak gönder
             img = Image.open(uploaded_file)
             content_to_send.append(img)
             prompt_intro = "Bu görseldeki eczane cari dökümünü incele."
@@ -86,9 +80,10 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
         st.warning("Lütfen işlem yapmadan önce bir metin girin veya bir dosya yükleyin.")
         st.stop()
 
-    with st.spinner("Yapay zeka verileri analiz ediyor ve şablonu oluşturuyor (Bu işlem 10-20 saniye sürebilir)..."):
+    with st.spinner("Yapay zeka analiz ediyor... (Yaklaşık 10 saniye sürer)"):
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            # Model adını kesin ve standart olan "gemini-1.5-flash" olarak sabitledik
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             full_prompt = f"""
             {prompt_intro}
@@ -100,19 +95,17 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
             2. Her reçete için 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' ve 'Fiyat Farkı' kalemlerini ayıkla.
             3. 'Hastaya Yansıyan' kısmını her reçete için hesapla/bul.
             4. En altta Genel Bakiye'yi göster.
-            5. SADECE HTML kodu üret. Yazılı açıklama yapma.
+            5. SADECE HTML kodu üret. Başka hiçbir yazı yazma.
             
             TASARIM ŞABLONU:
             {TEMPLATE_HTML}
             """
             
-            # Yapay Zekaya gönder (PDF, Görsel veya Metin fark etmez)
             response = model.generate_content([full_prompt] + content_to_send)
-            
             final_html = response.text.replace("```html", "").replace("```", "").strip()
             
             st.success("İşlem Tamamlandı!")
             components.html(final_html, height=1000, scrolling=True)
             
         except Exception as e:
-            st.error(f"Hata oluştu: {str(e)}")
+            st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
