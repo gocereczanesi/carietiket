@@ -14,14 +14,25 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
+# --- GELİŞTİRİLMİŞ, BUTONLU VE FOTOĞRAF ÇEKME ÖZELLİKLİ HTML ŞABLONU ---
 TEMPLATE_HTML = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root { --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }
-        body { font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; justify-content: center; padding: 10px; color: var(--text); }
+        body { font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 10px; color: var(--text); }
+        
+        /* Üstteki Butonların Tasarımı */
+        .action-buttons { display: flex; gap: 15px; margin-bottom: 20px; width: 100%; max-width: 500px; justify-content: center; }
+        .btn { border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; color: white; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; }
+        .btn-print { background-color: #2980b9; }
+        .btn-print:hover { background-color: #1c5982; }
+        .btn-jpg { background-color: #27ae60; }
+        .btn-jpg:hover { background-color: #1e8449; }
+
         .container { width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; }
         .header { background: var(--primary); color: white; padding: 25px; text-align: left; }
         .header h1 { margin: 0; font-size: 18px; opacity: 0.9; font-weight: 400; }
@@ -37,31 +48,58 @@ TEMPLATE_HTML = """
         .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
         .grand-footer { background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }
         .grand-footer .price { font-size: 28px; font-weight: bold; }
+        
+        /* Çıktı Alırken Butonları Gizle */
+        @media print {
+            .action-buttons { display: none !important; }
+            body { padding: 0; background: white; }
+            .container { box-shadow: none; border: none; border-radius: 0; }
+        }
     </style>
 </head>
 <body>
+
+    <div class="action-buttons no-print">
+        <button class="btn btn-print" onclick="window.print()">🖨️ Yazdır</button>
+        <button class="btn btn-jpg" onclick="downloadJPG()">📸 JPG İndir (WhatsApp)</button>
+    </div>
+
+    <div class="container" id="capture-area">
+        </div>
+
+    <script>
+        function downloadJPG() {
+            // HTML'i resme çevirip indirir
+            html2canvas(document.getElementById('capture-area'), { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
+                let link = document.createElement('a');
+                link.download = 'Eczane_Hesap_Dokumu.jpg';
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+            });
+        }
+    </script>
 </body>
 </html>
 """
 
-col1, col2 = st.columns(2, gap="large")
+# EKRANI ASİMETRİK BÖLÜYORUZ: Sol taraf dar ([1]), Sağ taraf geniş ([2.5])
+col1, col2 = st.columns([1, 2.5], gap="large")
 
 with col1:
     st.subheader("📥 1. Veri Girişi")
-    st.markdown("Otomasyon metnini yapıştırın veya reçete/cari görselini yükleyin.")
     
-    tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Dosya/Fotoğraf Yükle"])
+    tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Dosya Yükle"])
 
     with tab1:
         raw_text = st.text_area("Cari Metnini Buraya Yapıştırın:", height=250)
 
     with tab2:
-        uploaded_file = st.file_uploader("Reçete görseli veya PDF yükleyin", type=["jpg", "jpeg", "png", "pdf"])
+        uploaded_file = st.file_uploader("Görsel veya PDF yükleyin", type=["jpg", "jpeg", "png", "pdf"])
         if uploaded_file:
             if "pdf" in uploaded_file.type:
-                st.info(f"📄 PDF eklendi: {uploaded_file.name}. Okumaya hazır!")
+                st.info(f"📄 PDF hazır: {uploaded_file.name}")
             else:
-                st.image(uploaded_file, caption="Yüklenen Dosya", use_column_width=True)
+                st.image(uploaded_file, caption="Yüklenen Görsel", use_column_width=True)
 
     submit_button = st.button("✨ Şeffaf Döküm Oluştur", type="primary", use_container_width=True)
 
@@ -83,18 +121,18 @@ with col2:
             content_to_send.append(raw_text)
             prompt_intro = "Aşağıdaki eczane cari metnini incele."
         else:
-            st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya bir dosya yükleyin.")
+            st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya dosya yükleyin.")
             st.stop()
 
         with st.spinner("Yapay zeka verileri şablona diziyor..."):
             try:
-                # KURUMSAL HESAPTA LİMİTSİZ ÇALIŞACAK ANA MODEL
+                # 2.5 FLASH MODELİ KULLANILIYOR
                 model = genai.GenerativeModel('gemini-2.5-flash')
                 
                 full_prompt = f"""
                 {prompt_intro}
                 
-                Verdiğim HTML/CSS şablonunu KESİNLİKLE BOZMADAN kullanarak, metindeki/görseldeki BÜTÜN reçeteleri, ilaçları ve fiyatları HTML içine yerleştir.
+                Verdiğim HTML/CSS şablonunu KESİNLİKLE BOZMADAN kullanarak, metindeki/görseldeki BÜTÜN reçeteleri, ilaçları ve fiyatları şablondaki `<div class="container" id="capture-area">` içine yerleştir. (Script ve action-buttons kısımlarına dokunma!)
                 
                 TALİMATLAR:
                 1. Hiçbir ilacı atlama. Reçete tarihlerini ve kodlarını doğru oku.
@@ -111,9 +149,11 @@ with col2:
                 final_html = response.text.replace("```html", "").replace("```", "").strip()
                 
                 st.success("Tasarım Başarıyla Oluşturuldu!")
-                components.html(final_html, height=850, scrolling=True)
+                
+                # HTML Sitede Gösteriliyor (Boyutu biraz daha büyüttüm ki butonlar rahat sığsın)
+                components.html(final_html, height=900, scrolling=True)
                 
             except Exception as e:
                 st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
     else:
-        st.info("👈 Lütfen sol taraftan veriyi girip 'Şeffaf Döküm Oluştur' butonuna basın.")
+        st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
