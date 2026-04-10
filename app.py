@@ -76,28 +76,10 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
         st.warning("Lütfen işlem yapmadan önce bir metin girin veya bir dosya yükleyin.")
         st.stop()
 
-    with st.spinner("Yapay zeka analiz ediyor... (Lütfen bekleyin)"):
+    with st.spinner("Yapay zeka analiz ediyor..."):
         try:
-            # --- 404 HATASINI ÇÖZEN OTOMATİK MODEL BULUCU ---
-            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            
-            best_model = "models/gemini-pro" # Varsayılan model
-            
-            for m in available_models:
-                if "1.5-flash" in m:
-                    best_model = m
-                    break
-                elif "1.5-pro" in m:
-                    best_model = m
-                    
-            if uploaded_file and "1.5" not in best_model:
-                for m in available_models:
-                    if "vision" in m:
-                        best_model = m
-                        break
-
-            model = genai.GenerativeModel(best_model)
-            # ------------------------------------------------
+            # --- ÇÖZÜM BURADA: YENİ MODELİ KULLANIYORUZ ---
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             full_prompt = f"""
             {prompt_intro}
@@ -118,7 +100,7 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
             response = model.generate_content([full_prompt] + content_to_send)
             final_html = response.text.replace("```html", "").replace("```", "").strip()
             
-            st.success(f"İşlem Tamamlandı! (Kullanılan Zeka Modeli: {best_model})")
+            st.success("İşlem Tamamlandı!")
             components.html(final_html, height=1000, scrolling=True)
             
         except Exception as e:
