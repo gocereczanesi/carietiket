@@ -3,7 +3,6 @@ import streamlit.components.v1 as components
 import google.generativeai as genai
 from PIL import Image
 
-# Sayfa yapısını "wide" (geniş ekran) yaptık ki ikiye bölünce daracık kalmasın
 st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="wide")
 
 st.title("💊 Eczane Akıllı Hesap Dökümü")
@@ -45,10 +44,8 @@ TEMPLATE_HTML = """
 </html>
 """
 
-# EKRANI İKİYE BÖLÜYORUZ
 col1, col2 = st.columns(2, gap="large")
 
-# SOL KOLON: VERİ GİRİŞİ
 with col1:
     st.subheader("📥 1. Veri Girişi")
     st.markdown("Otomasyon metnini yapıştırın veya reçete/cari görselini yükleyin.")
@@ -66,10 +63,8 @@ with col1:
             else:
                 st.image(uploaded_file, caption="Yüklenen Dosya", use_column_width=True)
 
-    # Butonu sol kolonun en altına koyuyoruz ve genişletiyoruz
     submit_button = st.button("✨ Şeffaf Döküm Oluştur", type="primary", use_container_width=True)
 
-# SAĞ KOLON: SONUÇ EKRANI
 with col2:
     st.subheader("🧾 2. Hastaya Verilecek Döküm")
     
@@ -91,10 +86,10 @@ with col2:
             st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya bir dosya yükleyin.")
             st.stop()
 
-        with st.spinner("Yapay zeka verileri şablona diziyor... (Yaklaşık 10 saniye)"):
+        with st.spinner("Yapay zeka verileri şablona diziyor..."):
             try:
-                # Modeli 2.5-flash olarak sabit tuttuk
-                model = genai.GenerativeModel('gemini-2.5-flash')
+                # GÜNLÜK LİMİTİ GENİŞ OLAN LİTE MODELE GEÇİŞ YAPILDI
+                model = genai.GenerativeModel('gemini-2.0-flash-lite')
                 
                 full_prompt = f"""
                 {prompt_intro}
@@ -116,12 +111,9 @@ with col2:
                 final_html = response.text.replace("```html", "").replace("```", "").strip()
                 
                 st.success("Tasarım Başarıyla Oluşturuldu!")
-                
-                # HTML'i sağ kolonda göster
                 components.html(final_html, height=850, scrolling=True)
                 
             except Exception as e:
                 st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
     else:
-        # Daha butona basılmadıysa sağ tarafta şu bilgi mesajı dursun:
-        st.info("👈 Lütfen sol taraftan veriyi girip 'Şeffaf Döküm Oluştur' butonuna basın. \n\nHastaya göstereceğiniz yeşil şablon burada belirecektir.")
+        st.info("👈 Lütfen sol taraftan veriyi girip 'Şeffaf Döküm Oluştur' butonuna basın.")
