@@ -54,7 +54,7 @@ with tab2:
     uploaded_file = st.file_uploader("Reçete görseli veya PDF yükleyin", type=["jpg", "jpeg", "png", "pdf"])
     if uploaded_file:
         if "pdf" in uploaded_file.type:
-            st.info(f"📄 PDF başarıyla eklendi: {uploaded_file.name}. Okumaya hazır!")
+            st.info(f"📄 PDF eklendi: {uploaded_file.name}. Okumaya hazır!")
         else:
             st.image(uploaded_file, caption="Yüklenen Dosya", use_column_width=True)
 
@@ -63,16 +63,12 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
     
     if uploaded_file:
         if "pdf" in uploaded_file.type:
-            content_to_send.append({
-                "mime_type": "application/pdf",
-                "data": uploaded_file.getvalue()
-            })
+            content_to_send.append({"mime_type": "application/pdf", "data": uploaded_file.getvalue()})
             prompt_intro = "Bu PDF dosyasındaki eczane cari dökümünü incele."
         else:
             img = Image.open(uploaded_file)
             content_to_send.append(img)
             prompt_intro = "Bu görseldeki eczane cari dökümünü incele."
-            
     elif raw_text.strip() != "":
         content_to_send.append(raw_text)
         prompt_intro = "Aşağıdaki eczane cari metnini incele."
@@ -80,10 +76,28 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
         st.warning("Lütfen işlem yapmadan önce bir metin girin veya bir dosya yükleyin.")
         st.stop()
 
-    with st.spinner("Yapay zeka analiz ediyor... (Yaklaşık 10 saniye sürer)"):
+    with st.spinner("Yapay zeka analiz ediyor... (Lütfen bekleyin)"):
         try:
-            # Model adını kesin ve standart olan "gemini-1.5-flash" olarak sabitledik
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            # --- 404 HATASINI ÇÖZEN OTOMATİK MODEL BULUCU ---
+            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            
+            best_model = "models/gemini-pro" # Varsayılan model
+            
+            for m in available_models:
+                if "1.5-flash" in m:
+                    best_model = m
+                    break
+                elif "1.5-pro" in m:
+                    best_model = m
+                    
+            if uploaded_file and "1.5" not in best_model:
+                for m in available_models:
+                    if "vision" in m:
+                        best_model = m
+                        break
+
+            model = genai.GenerativeModel(best_model)
+            # ------------------------------------------------
             
             full_prompt = f"""
             {prompt_intro}
@@ -95,7 +109,7 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
             2. Her reçete için 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' ve 'Fiyat Farkı' kalemlerini ayıkla.
             3. 'Hastaya Yansıyan' kısmını her reçete için hesapla/bul.
             4. En altta Genel Bakiye'yi göster.
-            5. SADECE HTML kodu üret. Başka hiçbir yazı yazma.
+            5. SADECE HTML kodu üret.
             
             TASARIM ŞABLONU:
             {TEMPLATE_HTML}
@@ -104,7 +118,7 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
             response = model.generate_content([full_prompt] + content_to_send)
             final_html = response.text.replace("```html", "").replace("```", "").strip()
             
-            st.success("İşlem Tamamlandı!")
+            st.success(f"İşlem Tamamlandı! (Kullanılan Zeka Modeli: {best_model})")
             components.html(final_html, height=1000, scrolling=True)
             
         except Exception as e:
