@@ -3,10 +3,10 @@ import streamlit.components.v1 as components
 import google.generativeai as genai
 from PIL import Image
 
-st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="centered")
+# Sayfa yapısını "wide" (geniş ekran) yaptık ki ikiye bölünce daracık kalmasın
+st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="wide")
 
 st.title("💊 Eczane Akıllı Hesap Dökümü")
-st.markdown("Otomasyon metnini yapıştırın veya **reçete/cari görselini (JPG, PNG, PDF)** yükleyin.")
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -45,63 +45,83 @@ TEMPLATE_HTML = """
 </html>
 """
 
-tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Dosya/Fotoğraf Yükle"])
+# EKRANI İKİYE BÖLÜYORUZ
+col1, col2 = st.columns(2, gap="large")
 
-with tab1:
-    raw_text = st.text_area("Cari Metnini Buraya Yapıştırın:", height=200)
-
-with tab2:
-    uploaded_file = st.file_uploader("Reçete görseli veya PDF yükleyin", type=["jpg", "jpeg", "png", "pdf"])
-    if uploaded_file:
-        if "pdf" in uploaded_file.type:
-            st.info(f"📄 PDF eklendi: {uploaded_file.name}. Okumaya hazır!")
-        else:
-            st.image(uploaded_file, caption="Yüklenen Dosya", use_column_width=True)
-
-if st.button("Şeffaf Döküm Oluştur", type="primary"):
-    content_to_send = []
+# SOL KOLON: VERİ GİRİŞİ
+with col1:
+    st.subheader("📥 1. Veri Girişi")
+    st.markdown("Otomasyon metnini yapıştırın veya reçete/cari görselini yükleyin.")
     
-    if uploaded_file:
-        if "pdf" in uploaded_file.type:
-            content_to_send.append({"mime_type": "application/pdf", "data": uploaded_file.getvalue()})
-            prompt_intro = "Bu PDF dosyasındaki eczane cari dökümünü incele."
-        else:
-            img = Image.open(uploaded_file)
-            content_to_send.append(img)
-            prompt_intro = "Bu görseldeki eczane cari dökümünü incele."
-    elif raw_text.strip() != "":
-        content_to_send.append(raw_text)
-        prompt_intro = "Aşağıdaki eczane cari metnini incele."
-    else:
-        st.warning("Lütfen işlem yapmadan önce bir metin girin veya bir dosya yükleyin.")
-        st.stop()
+    tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Dosya/Fotoğraf Yükle"])
 
-    with st.spinner("Yapay zeka analiz ediyor..."):
-        try:
-            # --- ÇÖZÜM BURADA: YENİ MODELİ KULLANIYORUZ ---
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            
-            full_prompt = f"""
-            {prompt_intro}
-            
-            Verdiğim HTML/CSS şablonunu KESİNLİKLE BOZMADAN kullanarak, metindeki/görseldeki BÜTÜN reçeteleri, ilaçları ve fiyatları HTML içine yerleştir.
-            
-            TALİMATLAR:
-            1. Hiçbir ilacı atlama. Reçete tarihlerini ve kodlarını doğru oku.
-            2. Her reçete için 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' ve 'Fiyat Farkı' kalemlerini ayıkla.
-            3. 'Hastaya Yansıyan' kısmını her reçete için hesapla/bul.
-            4. En altta Genel Bakiye'yi göster.
-            5. SADECE HTML kodu üret.
-            
-            TASARIM ŞABLONU:
-            {TEMPLATE_HTML}
-            """
-            
-            response = model.generate_content([full_prompt] + content_to_send)
-            final_html = response.text.replace("```html", "").replace("```", "").strip()
-            
-            st.success("İşlem Tamamlandı!")
-            components.html(final_html, height=1000, scrolling=True)
-            
-        except Exception as e:
-            st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
+    with tab1:
+        raw_text = st.text_area("Cari Metnini Buraya Yapıştırın:", height=250)
+
+    with tab2:
+        uploaded_file = st.file_uploader("Reçete görseli veya PDF yükleyin", type=["jpg", "jpeg", "png", "pdf"])
+        if uploaded_file:
+            if "pdf" in uploaded_file.type:
+                st.info(f"📄 PDF eklendi: {uploaded_file.name}. Okumaya hazır!")
+            else:
+                st.image(uploaded_file, caption="Yüklenen Dosya", use_column_width=True)
+
+    # Butonu sol kolonun en altına koyuyoruz ve genişletiyoruz
+    submit_button = st.button("✨ Şeffaf Döküm Oluştur", type="primary", use_container_width=True)
+
+# SAĞ KOLON: SONUÇ EKRANI
+with col2:
+    st.subheader("🧾 2. Hastaya Verilecek Döküm")
+    
+    if submit_button:
+        content_to_send = []
+        
+        if uploaded_file:
+            if "pdf" in uploaded_file.type:
+                content_to_send.append({"mime_type": "application/pdf", "data": uploaded_file.getvalue()})
+                prompt_intro = "Bu PDF dosyasındaki eczane cari dökümünü incele."
+            else:
+                img = Image.open(uploaded_file)
+                content_to_send.append(img)
+                prompt_intro = "Bu görseldeki eczane cari dökümünü incele."
+        elif raw_text.strip() != "":
+            content_to_send.append(raw_text)
+            prompt_intro = "Aşağıdaki eczane cari metnini incele."
+        else:
+            st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya bir dosya yükleyin.")
+            st.stop()
+
+        with st.spinner("Yapay zeka verileri şablona diziyor... (Yaklaşık 10 saniye)"):
+            try:
+                # Modeli 2.5-flash olarak sabit tuttuk
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                
+                full_prompt = f"""
+                {prompt_intro}
+                
+                Verdiğim HTML/CSS şablonunu KESİNLİKLE BOZMADAN kullanarak, metindeki/görseldeki BÜTÜN reçeteleri, ilaçları ve fiyatları HTML içine yerleştir.
+                
+                TALİMATLAR:
+                1. Hiçbir ilacı atlama. Reçete tarihlerini ve kodlarını doğru oku.
+                2. Her reçete için 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' ve 'Fiyat Farkı' kalemlerini ayıkla.
+                3. 'Hastaya Yansıyan' kısmını her reçete için hesapla/bul.
+                4. En altta Genel Bakiye'yi göster.
+                5. SADECE HTML kodu üret.
+                
+                TASARIM ŞABLONU:
+                {TEMPLATE_HTML}
+                """
+                
+                response = model.generate_content([full_prompt] + content_to_send)
+                final_html = response.text.replace("```html", "").replace("```", "").strip()
+                
+                st.success("Tasarım Başarıyla Oluşturuldu!")
+                
+                # HTML'i sağ kolonda göster
+                components.html(final_html, height=850, scrolling=True)
+                
+            except Exception as e:
+                st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
+    else:
+        # Daha butona basılmadıysa sağ tarafta şu bilgi mesajı dursun:
+        st.info("👈 Lütfen sol taraftan veriyi girip 'Şeffaf Döküm Oluştur' butonuna basın. \n\nHastaya göstereceğiniz yeşil şablon burada belirecektir.")
