@@ -88,7 +88,7 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
 
     with st.spinner("Yapay zeka verileri analiz ediyor ve şablonu oluşturuyor (Bu işlem 10-20 saniye sürebilir)..."):
         try:
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')
+            model = genai.GenerativeModel('gemini-1.5-flash')
             
             full_prompt = f"""
             {prompt_intro}
