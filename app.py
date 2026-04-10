@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
 from PIL import Image
-import io
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="centered")
@@ -58,24 +57,36 @@ with tab1:
 with tab2:
     uploaded_file = st.file_uploader("Reçete görseli veya PDF yükleyin", type=["jpg", "jpeg", "png", "pdf"])
     if uploaded_file:
-        st.image(uploaded_file, caption="Yüklenen Dosya", use_column_width=True)
+        if "pdf" in uploaded_file.type:
+            st.info(f"📄 PDF başarıyla eklendi: {uploaded_file.name}. Okumaya hazır!")
+        else:
+            st.image(uploaded_file, caption="Yüklenen Dosya", use_column_width=True)
 
 if st.button("Şeffaf Döküm Oluştur", type="primary"):
     content_to_send = []
     
     if uploaded_file:
-        # Dosyayı analiz için hazırla
-        img = Image.open(uploaded_file)
-        content_to_send.append(img)
-        prompt_intro = "Bu görseldeki/dosyadaki eczane cari dökümünü incele."
+        if "pdf" in uploaded_file.type:
+            # PDF ise metin okuyucuya PDF formatında gönder
+            content_to_send.append({
+                "mime_type": "application/pdf",
+                "data": uploaded_file.getvalue()
+            })
+            prompt_intro = "Bu PDF dosyasındaki eczane cari dökümünü incele."
+        else:
+            # Görsel ise fotoğraf olarak gönder
+            img = Image.open(uploaded_file)
+            content_to_send.append(img)
+            prompt_intro = "Bu görseldeki eczane cari dökümünü incele."
+            
     elif raw_text.strip() != "":
         content_to_send.append(raw_text)
         prompt_intro = "Aşağıdaki eczane cari metnini incele."
     else:
-        st.warning("Lütfen metin girin veya bir dosya yükleyin.")
+        st.warning("Lütfen işlem yapmadan önce bir metin girin veya bir dosya yükleyin.")
         st.stop()
 
-    with st.spinner("Yapay zeka analiz ediyor..."):
+    with st.spinner("Yapay zeka verileri analiz ediyor ve şablonu oluşturuyor (Bu işlem 10-20 saniye sürebilir)..."):
         try:
             model = genai.GenerativeModel('gemini-1.5-flash')
             
@@ -95,7 +106,7 @@ if st.button("Şeffaf Döküm Oluştur", type="primary"):
             {TEMPLATE_HTML}
             """
             
-            # Yapay Zekaya gönder (Görsel veya Metin fark etmez)
+            # Yapay Zekaya gönder (PDF, Görsel veya Metin fark etmez)
             response = model.generate_content([full_prompt] + content_to_send)
             
             final_html = response.text.replace("```html", "").replace("```", "").strip()
