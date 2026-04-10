@@ -88,8 +88,8 @@ with col2:
 
         with st.spinner("Yapay zeka verileri şablona diziyor..."):
             try:
-                # GÜNLÜK LİMİTİ GENİŞ OLAN LİTE MODELE GEÇİŞ YAPILDI
-                model = genai.GenerativeModel('gemini-2.0-flash-lite')
+                # KURUMSAL HESAPTA LİMİTSİZ ÇALIŞACAK ANA MODEL
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 
                 full_prompt = f"""
                 {prompt_intro}
