@@ -5,7 +5,7 @@ from PIL import Image
 
 st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="wide")
 
-st.title("💊 Eczane Akıllı Hesap Dökümü")
+st.title("💊 Eczane Cari Kart Oluşturucu")
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
