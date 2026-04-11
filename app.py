@@ -19,7 +19,7 @@ col1, col2 = st.columns([1, 2.5], gap="large")
 with col1:
     st.subheader("📥 1. Veri Girişi")
 
-    # --- YENİ EKLENEN SEÇENEK MENÜSÜ ---
+    # --- SEÇENEK MENÜSÜ ---
     st.markdown("**Döküm Türü Seçin:**")
     islem_turu = st.radio(
         label="Gizli Label",
@@ -177,5 +177,5 @@ with col2:
                 
             except Exception as e:
                 st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
-else:
-    st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
+    else:
+        st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
