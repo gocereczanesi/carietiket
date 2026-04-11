@@ -4,11 +4,17 @@ import google.generativeai as genai
 import json
 from PIL import Image
 
-# 1. TARAYICI SEKMESİ (TİTLE) DÜZELTİLDİ
+# Sayfa Ayarları
 st.set_page_config(page_title="Eczane Cari Kart Dökümü", page_icon="💊", layout="wide")
 
-# 2. ANA BAŞLIK DÜZELTİLDİ
 st.title("💊 Eczane Cari Kart Dökümü")
+
+# Metin kutusunu temizleme fonksiyonu (Session State)
+if "raw_text_input" not in st.session_state:
+    st.session_state["raw_text_input"] = ""
+
+def clear_text():
+    st.session_state["raw_text_input"] = ""
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -17,6 +23,7 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
+# --- HTML ŞABLONLARI ---
 TEMPLATE_TOP = """
 <!DOCTYPE html>
 <html lang="tr">
@@ -86,7 +93,15 @@ with col1:
     tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Görsel Yükle"])
 
     with tab1:
-        raw_text = st.text_area("Botanik Verisini Buraya Yapıştırın:", height=250)
+        # --- BAŞLIK VE TEMİZLE BUTONU YAN YANA ---
+        header_col, btn_col = st.columns([3, 1])
+        with header_col:
+            st.markdown("<p style='margin-top: 10px; margin-bottom: 0px; font-weight: bold;'>Botanik Verisini Yapıştırın:</p>", unsafe_allow_html=True)
+        with btn_col:
+            st.button("🗑️ Temizle", on_click=clear_text, use_container_width=True)
+            
+        # Text area artık state'e bağlı çalışıyor
+        raw_text = st.text_area("Gizli Label", key="raw_text_input", label_visibility="collapsed", height=250)
 
     with tab2:
         st.info("💡 **İpucu:** Sayfa üzerindeyken **CTRL+V** yaparak görseli direkt yapıştırabilirsiniz!")
@@ -97,7 +112,6 @@ with col1:
             else:
                 st.image(uploaded_file, caption="Sisteme Eklenen Görsel", use_column_width=True)
 
-    # 3. BUTON İSMİ DÜZELTİLDİ
     submit_button = st.button("✨ Cari Kart Oluştur", type="primary", use_container_width=True)
 
 with col2:
@@ -163,7 +177,6 @@ with col2:
                 response = model.generate_content([full_prompt] + content_to_send)
                 data = json.loads(response.text)
                 
-                # Fiş içi HTML Başlığı da düzeltildi
                 inner_html = f"""
                 <div class="header">
                     <h1>Eczane Cari Kart Dökümü</h1>
