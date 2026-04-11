@@ -14,7 +14,7 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- TAHSİLAT GÖSTERİMİ VE BUTONLAR EKLENMİŞ HTML ŞABLONU ---
+# --- TAHSİLATLARIN ÇIKARILDIĞI, SADECE REÇETE + YAZDIR/İNDİR BUTONLU ŞABLON ---
 TEMPLATE_HTML = """
 <!DOCTYPE html>
 <html lang="tr">
@@ -47,11 +47,6 @@ TEMPLATE_HTML = """
         .detail-line { display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }
         .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
         
-        /* Tahsilat Alanı Tasarımı */
-        .tahsilat-block { padding: 15px 20px; background: #eafaf1; border-bottom: 8px solid var(--bg); }
-        .tahsilat-header { font-size: 15px; font-weight: bold; color: #27ae60; margin-bottom: 10px; border-bottom: 1px solid #d5f5e3; padding-bottom: 5px; }
-        .tahsilat-row { display: flex; justify-content: space-between; font-size: 13px; color: #1e8449; margin-bottom: 4px; font-weight: 500; }
-
         .grand-footer { background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }
         .grand-footer .price { font-size: 28px; font-weight: bold; }
         
@@ -130,31 +125,25 @@ with col2:
 
         with st.spinner("🚀 Hızlı modda veriler şablona diziliyor..."):
             try:
-                # ⚡ ÇÖZÜM BURADA: Senin hesabında çalışan 2.5 modelini kullanıyoruz ama Robot Modunda (temperature=0.0)
+                # ⚡ HIZ OPTİMİZASYONU: Robot Modu Aktif
                 generation_config = {
                     "temperature": 0.0, 
                 }
                 model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
                 
+                # Talimat (Prompt) gereksiz kelimelerden arındırılarak kısaltıldı
                 full_prompt = f"""
                 {prompt_intro}
+                Aşağıdaki HTML şablonunun `<div class="container" id="capture-area">` içine verileri yerleştir.
                 
-                Verdiğim HTML/CSS şablonunu KESİNLİKLE BOZMADAN kullanarak, metindeki/görseldeki BÜTÜN reçeteleri, ilaçları, fiyatları ve TAHSİLATLARI HTML içine yerleştir.
+                KURALLAR:
+                1. Reçeteleri ve ilaçları atlama.
+                2. 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' ayıkla.
+                3. "Fark" yerine kesinlikle "Fiyat Farkı" yaz.
+                4. Hastaya yansıyan tutarları ve Genel Bakiye'yi hesapla/yaz.
+                5. SADECE çalışabilir HTML kodu ver. Markdown veya ek metin kullanma.
                 
-                TALİMATLAR:
-                1. Hiçbir ilacı atlama. Reçete tarihlerini ve kodlarını doğru oku.
-                2. Her reçete için 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' kalemlerini ayıkla.
-                3. İlaçların altındaki fark kısmına KESİNLİKLE sadece "Fark" yerine "Fiyat Farkı" yaz.
-                4. 'Hastaya Yansıyan' kısmını her reçete için hesapla/bul.
-                5. DİKKAT (TAHSİLATLAR): Eğer metinde/görselde hastanın yaptığı ödemeler (Tahsilat, Nakit, Kredi Kartı vb.) varsa, bunları reçeteler bittikten sonra şu HTML blok yapısıyla ekle:
-                   <div class="tahsilat-block">
-                       <div class="tahsilat-header">Yapılan Ödemeler (Tahsilat)</div>
-                       <div class="tahsilat-row"><span>Tarih - Açıklama (Nakit/KK)</span><span>- Tutar TL</span></div>
-                   </div>
-                6. En altta Genel Bakiye'yi (hastanın toplam borcundan, yaptığı tahsilatlar düşüldükten sonra kalan NET borcu) göster.
-                7. SADECE HTML kodu üret. Başka hiçbir açıklama yapma.
-                
-                TASARIM ŞABLONU:
+                HTML ŞABLON:
                 {TEMPLATE_HTML}
                 """
                 
