@@ -14,7 +14,7 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- TAHSİLAT GÖSTERİMİ EKLENMİŞ HTML ŞABLONU ---
+# --- TAHSİLAT GÖSTERİMİ VE BUTONLAR EKLENMİŞ HTML ŞABLONU ---
 TEMPLATE_HTML = """
 <!DOCTYPE html>
 <html lang="tr">
@@ -47,7 +47,7 @@ TEMPLATE_HTML = """
         .detail-line { display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }
         .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
         
-        /* Yeni Tahsilat Alanı Tasarımı */
+        /* Tahsilat Alanı Tasarımı */
         .tahsilat-block { padding: 15px 20px; background: #eafaf1; border-bottom: 8px solid var(--bg); }
         .tahsilat-header { font-size: 15px; font-weight: bold; color: #27ae60; margin-bottom: 10px; border-bottom: 1px solid #d5f5e3; padding-bottom: 5px; }
         .tahsilat-row { display: flex; justify-content: space-between; font-size: 13px; color: #1e8449; margin-bottom: 4px; font-weight: 500; }
@@ -130,11 +130,11 @@ with col2:
 
         with st.spinner("🚀 Hızlı modda veriler şablona diziliyor..."):
             try:
-                # ⚡ HIZ OPTİMİZASYONU
+                # ⚡ ÇÖZÜM BURADA: Senin hesabında çalışan 2.5 modelini kullanıyoruz ama Robot Modunda (temperature=0.0)
                 generation_config = {
                     "temperature": 0.0, 
                 }
-                model = genai.GenerativeModel('gemini-1.5-flash', generation_config=generation_config)
+                model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
                 
                 full_prompt = f"""
                 {prompt_intro}
