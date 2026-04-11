@@ -14,7 +14,7 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- YAZDIR/İNDİR BUTONLU VE FİYAT FARKI DÜZENLEMELİ ŞABLON ---
+# --- TAHSİLAT GÖSTERİMİ EKLENMİŞ HTML ŞABLONU ---
 TEMPLATE_HTML = """
 <!DOCTYPE html>
 <html lang="tr">
@@ -36,6 +36,7 @@ TEMPLATE_HTML = """
         .header { background: var(--primary); color: white; padding: 25px; text-align: left; }
         .header h1 { margin: 0; font-size: 18px; opacity: 0.9; font-weight: 400; }
         .patient-name { font-size: 22px; font-weight: bold; margin-top: 5px; }
+        
         .recete-block { padding: 20px; border-bottom: 8px solid var(--bg); }
         .recete-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
         .date-tag { font-weight: bold; color: var(--primary); font-size: 14px; }
@@ -45,6 +46,12 @@ TEMPLATE_HTML = """
         .details-box { background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }
         .detail-line { display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }
         .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
+        
+        /* Yeni Tahsilat Alanı Tasarımı */
+        .tahsilat-block { padding: 15px 20px; background: #eafaf1; border-bottom: 8px solid var(--bg); }
+        .tahsilat-header { font-size: 15px; font-weight: bold; color: #27ae60; margin-bottom: 10px; border-bottom: 1px solid #d5f5e3; padding-bottom: 5px; }
+        .tahsilat-row { display: flex; justify-content: space-between; font-size: 13px; color: #1e8449; margin-bottom: 4px; font-weight: 500; }
+
         .grand-footer { background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }
         .grand-footer .price { font-size: 28px; font-weight: bold; }
         
@@ -84,14 +91,13 @@ col1, col2 = st.columns([1, 2.5], gap="large")
 with col1:
     st.subheader("📥 1. Veri Girişi")
     
-    tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Görsel Yükle/Yapıştır"])
+    tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Görsel Yükle"])
 
     with tab1:
         raw_text = st.text_area("Cari Metnini Buraya Yapıştırın:", height=250)
 
     with tab2:
-        # CTRL+V İpucunu buraya ekledik
-        st.info("💡 **İpucu:** Ekran görüntüsü aldıktan sonra sayfa üzerindeyken **CTRL+V** yaparak görseli direkt yapıştırabilirsiniz!")
+        st.info("💡 **İpucu:** Sayfa üzerindeyken **CTRL+V** yaparak görseli direkt yapıştırabilirsiniz!")
         uploaded_file = st.file_uploader("Görsel veya PDF yükleyin", type=["jpg", "jpeg", "png", "pdf"])
         if uploaded_file:
             if "pdf" in uploaded_file.type:
@@ -122,22 +128,31 @@ with col2:
             st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya dosya yükleyin.")
             st.stop()
 
-        with st.spinner("Yapay zeka verileri şablona diziyor..."):
+        with st.spinner("🚀 Hızlı modda veriler şablona diziliyor..."):
             try:
-                model = genai.GenerativeModel('gemini-2.5-flash')
+                # ⚡ HIZ OPTİMİZASYONU
+                generation_config = {
+                    "temperature": 0.0, 
+                }
+                model = genai.GenerativeModel('gemini-1.5-flash', generation_config=generation_config)
                 
                 full_prompt = f"""
                 {prompt_intro}
                 
-                Verdiğim HTML/CSS şablonunu KESİNLİKLE BOZMADAN kullanarak, metindeki/görseldeki BÜTÜN reçeteleri, ilaçları ve fiyatları HTML içine yerleştir.
+                Verdiğim HTML/CSS şablonunu KESİNLİKLE BOZMADAN kullanarak, metindeki/görseldeki BÜTÜN reçeteleri, ilaçları, fiyatları ve TAHSİLATLARI HTML içine yerleştir.
                 
                 TALİMATLAR:
                 1. Hiçbir ilacı atlama. Reçete tarihlerini ve kodlarını doğru oku.
                 2. Her reçete için 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' kalemlerini ayıkla.
-                3. İlaçların altındaki fark kısmına KESİNLİKLE sadece "Fark" yerine "Fiyat Farkı" yaz. (Örn: Fiyat Farkı: 15.00 TL)
+                3. İlaçların altındaki fark kısmına KESİNLİKLE sadece "Fark" yerine "Fiyat Farkı" yaz.
                 4. 'Hastaya Yansıyan' kısmını her reçete için hesapla/bul.
-                5. En altta Genel Bakiye'yi göster.
-                6. SADECE HTML kodu üret.
+                5. DİKKAT (TAHSİLATLAR): Eğer metinde/görselde hastanın yaptığı ödemeler (Tahsilat, Nakit, Kredi Kartı vb.) varsa, bunları reçeteler bittikten sonra şu HTML blok yapısıyla ekle:
+                   <div class="tahsilat-block">
+                       <div class="tahsilat-header">Yapılan Ödemeler (Tahsilat)</div>
+                       <div class="tahsilat-row"><span>Tarih - Açıklama (Nakit/KK)</span><span>- Tutar TL</span></div>
+                   </div>
+                6. En altta Genel Bakiye'yi (hastanın toplam borcundan, yaptığı tahsilatlar düşüldükten sonra kalan NET borcu) göster.
+                7. SADECE HTML kodu üret. Başka hiçbir açıklama yapma.
                 
                 TASARIM ŞABLONU:
                 {TEMPLATE_HTML}
@@ -146,7 +161,7 @@ with col2:
                 response = model.generate_content([full_prompt] + content_to_send)
                 final_html = response.text.replace("```html", "").replace("```", "").strip()
                 
-                st.success("Tasarım Başarıyla Oluşturuldu!")
+                st.success("⚡ Döküm Hızla Oluşturuldu!")
                 
                 components.html(final_html, height=900, scrolling=True)
                 
