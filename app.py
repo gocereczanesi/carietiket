@@ -1,11 +1,12 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
+import json  # JSON verisi okumak için yeni eklendi
 from PIL import Image
 
 st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="wide")
 
-st.title("💊 Eczane Cari Kart Oluşturucu")
+st.title("💊 Eczane Akıllı Hesap Dökümü")
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -14,8 +15,8 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- SADE VE HIZLI HTML ŞABLONU (YAZDIR/İNDİR BUTONLU) ---
-TEMPLATE_HTML = """
+# --- HTML PARÇALARI (Yapay zekayı yormamak için Python'da tutuyoruz) ---
+TEMPLATE_TOP = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -24,19 +25,16 @@ TEMPLATE_HTML = """
     <style>
         :root { --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }
         body { font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 10px; color: var(--text); }
-        
         .action-buttons { display: flex; gap: 15px; margin-bottom: 20px; width: 100%; max-width: 500px; justify-content: center; }
         .btn { border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; color: white; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; }
         .btn-print { background-color: #2980b9; }
         .btn-print:hover { background-color: #1c5982; }
         .btn-jpg { background-color: #27ae60; }
         .btn-jpg:hover { background-color: #1e8449; }
-
         .container { width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; }
         .header { background: var(--primary); color: white; padding: 25px; text-align: left; }
         .header h1 { margin: 0; font-size: 18px; opacity: 0.9; font-weight: 400; }
         .patient-name { font-size: 22px; font-weight: bold; margin-top: 5px; }
-        
         .recete-block { padding: 20px; border-bottom: 8px solid var(--bg); }
         .recete-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
         .date-tag { font-weight: bold; color: var(--primary); font-size: 14px; }
@@ -46,10 +44,8 @@ TEMPLATE_HTML = """
         .details-box { background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }
         .detail-line { display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }
         .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
-        
         .grand-footer { background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }
         .grand-footer .price { font-size: 28px; font-weight: bold; }
-        
         @media print {
             .action-buttons { display: none !important; }
             body { padding: 0; background: white; }
@@ -58,15 +54,15 @@ TEMPLATE_HTML = """
     </style>
 </head>
 <body>
-
     <div class="action-buttons no-print">
         <button class="btn btn-print" onclick="window.print()">🖨️ Yazdır</button>
         <button class="btn btn-jpg" onclick="downloadJPG()">📸 JPG İndir (WhatsApp)</button>
     </div>
-
     <div class="container" id="capture-area">
-        </div>
+"""
 
+TEMPLATE_BOTTOM = """
+    </div>
     <script>
         function downloadJPG() {
             html2canvas(document.getElementById('capture-area'), { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
@@ -123,37 +119,96 @@ with col2:
             st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya dosya yükleyin.")
             st.stop()
 
-        with st.spinner("🚀 Hızlı modda veriler şablona diziliyor..."):
+        with st.spinner("🚀 Turbo Modda veriler işleniyor..."):
             try:
-                # ⚡ HIZ OPTİMİZASYONU: Robot Modu Aktif (temperature = 0.0)
+                # ⚡ TURBO HIZ: Yapay Zekayı Sadece JSON (Saf Veri) Üretmeye Zorluyoruz
                 generation_config = {
-                    "temperature": 0.0, 
+                    "temperature": 0.0,
+                    "response_mime_type": "application/json"
                 }
                 model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
                 
-                # SADELEŞTİRİLMİŞ TALİMAT
                 full_prompt = f"""
                 {prompt_intro}
-                Aşağıdaki HTML şablonunun `<div class="container" id="capture-area">` içine verileri yerleştir.
+                
+                HİÇBİR HTML VEYA AÇIKLAMA YAZMA. Sadece aşağıdaki formata tam uygun bir JSON çıktısı ver.
                 
                 KURALLAR:
-                1. Reçeteleri ve ilaçları atlama.
-                2. 'Hasta Katılım Payı', 'Muayene Ücreti', 'Reçete Payı' ayıkla.
-                3. "Fark" yerine kesinlikle "Fiyat Farkı" yaz.
-                4. Hastaya yansıyan tutarları ve Genel Bakiye'yi hesapla/yaz.
-                5. SADECE çalışabilir HTML kodu ver. Markdown veya ek metin kullanma.
+                1. Reçete kodu yoksa boş bırak.
+                2. İlaçta fiyat farkı yoksa veya 0 ise "0.00" yaz.
+                3. Tüm tutarları sayısal olarak (Örn: "15.50") ver.
                 
-                HTML ŞABLON:
-                {TEMPLATE_HTML}
+                JSON ŞEMASI:
+                {{
+                  "hasta_adi": "Hasta Adı Soyadı",
+                  "receteler": [
+                    {{
+                      "tarih": "GG.AA.YYYY",
+                      "kod": "Reçete Kodu",
+                      "ilaclar": [
+                        {{"ad": "İlaç Adı", "fiyat_farki": "0.00"}}
+                      ],
+                      "katilim_payi": "0.00",
+                      "muayene_ucreti": "0.00",
+                      "recete_payi": "0.00",
+                      "yansiyan": "0.00"
+                    }}
+                  ],
+                  "genel_bakiye": "0.00"
+                }}
                 """
                 
                 response = model.generate_content([full_prompt] + content_to_send)
-                final_html = response.text.replace("```html", "").replace("```", "").strip()
                 
-                st.success("⚡ Döküm Hızla Oluşturuldu!")
+                # LLM'den gelen saf veriyi (JSON) okuyoruz
+                data = json.loads(response.text)
                 
+                # ⚡ PYTHON İLE ANINDA HTML ÇİZİMİ (Yapay zekayı HTML yazmaktan kurtardık)
+                inner_html = f"""
+                <div class="header">
+                    <h1>Eczane Hesap Dökümü</h1>
+                    <div class="patient-name">{data.get('hasta_adi', 'Hasta Bilgisi Alınamadı')}</div>
+                </div>
+                """
+                
+                for r in data.get('receteler', []):
+                    inner_html += f"""
+                    <div class="recete-block">
+                        <div class="recete-header">
+                            <span class="date-tag">{r.get('tarih', '')}</span>
+                            <span class="kod-tag">{r.get('kod', '')}</span>
+                        </div>
+                    """
+                    for ilac in r.get('ilaclar', []):
+                        fark = str(ilac.get('fiyat_farki', '0.00'))
+                        # Eğer ilaç farkı 0 ise ekranda göstermiyoruz, kalabalık yapmasın
+                        fark_str = f"<span class='fark-info'>Fiyat Farkı: {fark} TL</span>" if fark not in ["0.00", "0,00", "0", "0.0", "", None] else ""
+                        inner_html += f"<div class='ilac-row'><span>{ilac.get('ad', '')}</span>{fark_str}</div>"
+                    
+                    inner_html += f"""
+                        <div class="details-box">
+                            <div class="detail-line"><span>Hasta Katılım Payı</span><span>{r.get('katilim_payi', '0.00')} TL</span></div>
+                            <div class="detail-line"><span>Muayene Ücreti</span><span>{r.get('muayene_ucreti', '0.00')} TL</span></div>
+                            <div class="detail-line"><span>Reçete Payı</span><span>{r.get('recete_payi', '0.00')} TL</span></div>
+                            <div class="yansiyan-row"><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0.00')} TL</span></div>
+                        </div>
+                    </div>
+                    """
+                    
+                inner_html += f"""
+                <div class="grand-footer">
+                    <span>Genel Bakiye</span><span class="price">{data.get('genel_bakiye', '0.00')} TL</span>
+                </div>
+                """
+                
+                # Şablonu birleştir ve ekrana bas
+                final_html = TEMPLATE_TOP + inner_html + TEMPLATE_BOTTOM
+                
+                st.success("⚡ Turbo Döküm Hazır!")
                 components.html(final_html, height=900, scrolling=True)
                 
+            except json.JSONDecodeError:
+                st.error("⚠️ Veri işlenirken bir hata oluştu. Lütfen tekrar deneyin.")
             except Exception as e:
                 st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
     else:
