@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
-import json  # JSON verisi okumak için yeni eklendi
+import json
 from PIL import Image
 
 st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="wide")
@@ -15,7 +15,6 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- HTML PARÇALARI (Yapay zekayı yormamak için Python'da tutuyoruz) ---
 TEMPLATE_TOP = """
 <!DOCTYPE html>
 <html lang="tr">
@@ -85,7 +84,7 @@ with col1:
     tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Görsel Yükle"])
 
     with tab1:
-        raw_text = st.text_area("Cari Metnini Buraya Yapıştırın:", height=250)
+        raw_text = st.text_area("Botanik Verisini Buraya Yapıştırın:", height=250)
 
     with tab2:
         st.info("💡 **İpucu:** Sayfa üzerindeyken **CTRL+V** yaparak görseli direkt yapıştırabilirsiniz!")
@@ -114,29 +113,30 @@ with col2:
                 prompt_intro = "Bu görseldeki eczane cari dökümünü incele."
         elif raw_text.strip() != "":
             content_to_send.append(raw_text)
-            prompt_intro = "Aşağıdaki eczane cari metnini incele."
+            prompt_intro = "Aşağıdaki Botanik eczane otomasyonu metnini incele."
         else:
             st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya dosya yükleyin.")
             st.stop()
 
-        with st.spinner("🚀 Turbo Modda veriler işleniyor..."):
+        with st.spinner("🚀 Veriler Botanik şablonuna göre işleniyor..."):
             try:
-                # ⚡ TURBO HIZ: Yapay Zekayı Sadece JSON (Saf Veri) Üretmeye Zorluyoruz
                 generation_config = {
                     "temperature": 0.0,
                     "response_mime_type": "application/json"
                 }
                 model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
                 
+                # BOTANİK PROGRAMINA ÖZEL YENİ KURALLAR EKLENDİ
                 full_prompt = f"""
                 {prompt_intro}
                 
-                HİÇBİR HTML VEYA AÇIKLAMA YAZMA. Sadece aşağıdaki formata tam uygun bir JSON çıktısı ver.
+                HİÇBİR AÇIKLAMA YAZMA. Sadece JSON formatında çıktı ver.
                 
-                KURALLAR:
-                1. Reçete kodu yoksa boş bırak.
-                2. İlaçta fiyat farkı yoksa veya 0 ise "0.00" yaz.
-                3. Tüm tutarları sayısal olarak (Örn: "15.50") ver.
+                BOTANİK PROGRAMI KURALLARI:
+                1. Veride hem "Reçetesi" hem de "Perakendesi" (elden satış) geçebilir. İkisini de "receteler" listesine blok olarak ekle.
+                2. Perakende işlemlerde kod kısmına "Perakende Satış" yaz. Muayene, reçete ve katılım payları 0.00'dır. Yalnızca hastanın ödediği net "Ödeme Toplam" kısmını 'yansiyan' değerine yaz.
+                3. Reçeteler için HESAPLAR satırındaki Hasta Katılım, Reçete Katılım, Muayene ve Fiyat Farkı toplamlarını alıp 'yansiyan' kısmına hastanın ödeyeceği tutarı yaz.
+                4. "genel_bakiye" en sağ sütunda artarak giden (kümülatif) rakamın EN SONUNCUSUDUR.
                 
                 JSON ŞEMASI:
                 {{
@@ -144,7 +144,7 @@ with col2:
                   "receteler": [
                     {{
                       "tarih": "GG.AA.YYYY",
-                      "kod": "Reçete Kodu",
+                      "kod": "Reçete Kodu veya Perakende",
                       "ilaclar": [
                         {{"ad": "İlaç Adı", "fiyat_farki": "0.00"}}
                       ],
@@ -159,11 +159,8 @@ with col2:
                 """
                 
                 response = model.generate_content([full_prompt] + content_to_send)
-                
-                # LLM'den gelen saf veriyi (JSON) okuyoruz
                 data = json.loads(response.text)
                 
-                # ⚡ PYTHON İLE ANINDA HTML ÇİZİMİ (Yapay zekayı HTML yazmaktan kurtardık)
                 inner_html = f"""
                 <div class="header">
                     <h1>Eczane Hesap Dökümü</h1>
@@ -181,19 +178,27 @@ with col2:
                     """
                     for ilac in r.get('ilaclar', []):
                         fark = str(ilac.get('fiyat_farki', '0.00'))
-                        # Eğer ilaç farkı 0 ise ekranda göstermiyoruz, kalabalık yapmasın
                         fark_str = f"<span class='fark-info'>Fiyat Farkı: {fark} TL</span>" if fark not in ["0.00", "0,00", "0", "0.0", "", None] else ""
                         inner_html += f"<div class='ilac-row'><span>{ilac.get('ad', '')}</span>{fark_str}</div>"
                     
-                    inner_html += f"""
+                    # Eğer perakende satış ise muayene detaylarını gizle, sadece yansıyanı göster
+                    if "Perakende" in r.get('kod', ''):
+                        inner_html += f"""
+                        <div class="details-box">
+                            <div class="yansiyan-row"><span>Perakende / Nakit Tutar</span><span>{r.get('yansiyan', '0.00')} TL</span></div>
+                        </div>
+                        </div>
+                        """
+                    else:
+                        inner_html += f"""
                         <div class="details-box">
                             <div class="detail-line"><span>Hasta Katılım Payı</span><span>{r.get('katilim_payi', '0.00')} TL</span></div>
                             <div class="detail-line"><span>Muayene Ücreti</span><span>{r.get('muayene_ucreti', '0.00')} TL</span></div>
                             <div class="detail-line"><span>Reçete Payı</span><span>{r.get('recete_payi', '0.00')} TL</span></div>
                             <div class="yansiyan-row"><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0.00')} TL</span></div>
                         </div>
-                    </div>
-                    """
+                        </div>
+                        """
                     
                 inner_html += f"""
                 <div class="grand-footer">
@@ -201,7 +206,6 @@ with col2:
                 </div>
                 """
                 
-                # Şablonu birleştir ve ekrana bas
                 final_html = TEMPLATE_TOP + inner_html + TEMPLATE_BOTTOM
                 
                 st.success("⚡ Turbo Döküm Hazır!")
