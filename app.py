@@ -4,9 +4,11 @@ import google.generativeai as genai
 import json
 from PIL import Image
 
-st.set_page_config(page_title="Eczane Şeffaf Hesap", page_icon="💊", layout="wide")
+# 1. TARAYICI SEKMESİ (TİTLE) DÜZELTİLDİ
+st.set_page_config(page_title="Eczane Cari Kart Dökümü", page_icon="💊", layout="wide")
 
-st.title("💊 Eczane Akıllı Hesap Dökümü")
+# 2. ANA BAŞLIK DÜZELTİLDİ
+st.title("💊 Eczane Cari Kart Dökümü")
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -66,7 +68,7 @@ TEMPLATE_BOTTOM = """
         function downloadJPG() {
             html2canvas(document.getElementById('capture-area'), { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
                 let link = document.createElement('a');
-                link.download = 'Eczane_Hesap_Dokumu.jpg';
+                link.download = 'Eczane_Cari_Kart_Dokumu.jpg';
                 link.href = canvas.toDataURL('image/jpeg', 0.9);
                 link.click();
             });
@@ -95,7 +97,8 @@ with col1:
             else:
                 st.image(uploaded_file, caption="Sisteme Eklenen Görsel", use_column_width=True)
 
-    submit_button = st.button("✨ Şeffaf Döküm Oluştur", type="primary", use_container_width=True)
+    # 3. BUTON İSMİ DÜZELTİLDİ
+    submit_button = st.button("✨ Cari Kart Oluştur", type="primary", use_container_width=True)
 
 with col2:
     st.subheader("🧾 2. Hastaya Verilecek Döküm")
@@ -126,7 +129,6 @@ with col2:
                 }
                 model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
                 
-                # BOTANİK PROGRAMINA ÖZEL YENİ KURALLAR EKLENDİ
                 full_prompt = f"""
                 {prompt_intro}
                 
@@ -161,9 +163,10 @@ with col2:
                 response = model.generate_content([full_prompt] + content_to_send)
                 data = json.loads(response.text)
                 
+                # Fiş içi HTML Başlığı da düzeltildi
                 inner_html = f"""
                 <div class="header">
-                    <h1>Eczane Hesap Dökümü</h1>
+                    <h1>Eczane Cari Kart Dökümü</h1>
                     <div class="patient-name">{data.get('hasta_adi', 'Hasta Bilgisi Alınamadı')}</div>
                 </div>
                 """
@@ -181,7 +184,6 @@ with col2:
                         fark_str = f"<span class='fark-info'>Fiyat Farkı: {fark} TL</span>" if fark not in ["0.00", "0,00", "0", "0.0", "", None] else ""
                         inner_html += f"<div class='ilac-row'><span>{ilac.get('ad', '')}</span>{fark_str}</div>"
                     
-                    # Eğer perakende satış ise muayene detaylarını gizle, sadece yansıyanı göster
                     if "Perakende" in r.get('kod', ''):
                         inner_html += f"""
                         <div class="details-box">
@@ -208,7 +210,7 @@ with col2:
                 
                 final_html = TEMPLATE_TOP + inner_html + TEMPLATE_BOTTOM
                 
-                st.success("⚡ Turbo Döküm Hazır!")
+                st.success("⚡ Cari Kart Hazır!")
                 components.html(final_html, height=900, scrolling=True)
                 
             except json.JSONDecodeError:
