@@ -150,7 +150,7 @@ with col2:
                 2. Her ilaç için ADET (Miktar) ve FİYAT (Birim fiyat veya Toplam fiyat) bilgilerini mutlaka çek.
                 3. "Fiyat Farkı" kısmını her ilaç için kontrol et, varsa çek.
                 4. Reçeteler için HESAPLAR satırındaki tutarları (Katılım Payları, Muayene, Reçete Payı VE Fiyat Farkı Toplamı) eksiksiz ayıkla.
-                5. "genel_bakiye" en sağ sütundaki son kümülatif rakamdır.
+                5. "genel_bakiye" en sağ sütundaki son kümülatif rakamdır (Hastanın toplam ödeyeceği tutar).
                 
                 JSON ŞEMASI:
                 {
@@ -231,7 +231,7 @@ with col2:
                     
                 inner_html += f"""
                 <div class="grand-footer">
-                    <span>Genel Bakiye</span><span class="price">{data.get('genel_bakiye', '0.00')} TL</span>
+                    <span>Hastaya Yansıyan</span><span class="price">{data.get('genel_bakiye', '0.00')} TL</span>
                 </div>
                 """
                 
