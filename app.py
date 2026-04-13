@@ -1,3 +1,13 @@
+Haklısın, Botanik dökümünde o bilgiler çok net görünüyor ve hastanın neye ne kadar ödediğini anlaması için adet ve fiyat bilgisi şart. Ayrıca her reçetenin başında isim yazdığı için, sistemin bu isimleri de doğru yakalayıp her bloğun içine işlemesi daha güvenli olur.
+
+İstediğin güncellemeleri yaptım:
+1.  **Adet ve Fiyat Eklendi:** Her ilacın yanında kaç adet olduğu ve birim fiyatı artık görünüyor.
+2.  **Kişiye Özel Reçete Takibi:** Her reçete bloğunun içine "Hasta:" alanı eklendi. Böylece dökümde farklı isimler varsa karıştırılmayacak.
+3.  **Hız ve Kilitlenme Koruması:** Mevcut yüksek hız ve kilitlenme koruması yapısı korundu.
+
+Lütfen `app.py` dosyanın içini tamamen silip bu en gelişmiş versiyonu yapıştır:
+
+```python
 import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
@@ -45,11 +55,16 @@ TEMPLATE_TOP = """
         .header h1 { margin: 0; font-size: 18px; opacity: 0.9; font-weight: 400; }
         .patient-name { font-size: 22px; font-weight: bold; margin-top: 5px; }
         .recete-block { padding: 20px; border-bottom: 8px solid var(--bg); }
-        .recete-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+        .recete-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+        .recete-patient { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 10px; display: block; }
         .date-tag { font-weight: bold; color: var(--primary); font-size: 14px; }
         .kod-tag { font-size: 11px; color: #999; border: 1px solid #eee; padding: 2px 6px; border-radius: 4px; }
-        .ilac-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 8px 0; border-bottom: 1px dashed #f0f0f0; }
-        .fark-info { color: var(--fark); font-weight: bold; font-size: 11px; display: block; margin-top: 2px; }
+        
+        .ilac-row { padding: 10px 0; border-bottom: 1px dashed #f0f0f0; }
+        .ilac-main { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; }
+        .ilac-sub { display: flex; justify-content: space-between; font-size: 11px; color: #777; margin-top: 2px; }
+        
+        .fark-info { color: var(--fark); font-weight: bold; }
         .details-box { background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }
         .detail-line { display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }
         .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
@@ -122,83 +137,64 @@ with col2:
         if uploaded_file:
             if "pdf" in uploaded_file.type:
                 content_to_send.append({"mime_type": "application/pdf", "data": uploaded_file.getvalue()})
-                prompt_intro = "Bu PDF dosyasındaki eczane cari dökümünü incele."
             else:
                 img = Image.open(uploaded_file)
                 content_to_send.append(img)
-                prompt_intro = "Bu görseldeki eczane cari dökümünü incele."
         elif raw_text.strip() != "":
             content_to_send.append(raw_text)
-            prompt_intro = "Aşağıdaki Botanik eczane otomasyonu metnini incele."
         else:
             st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya dosya yükleyin.")
             st.stop()
 
-        with st.spinner("🚀 Veriler işleniyor (Kilitlenme Koruması Aktif)..."):
+        with st.spinner("🚀 Veriler işleniyor..."):
             try:
-                # ⚡ KİLİTLENMEYE SEBEP OLAN MİME TİPİNİ KALDIRDIK. Sadece 0.0 temp bırakıyoruz.
-                generation_config = {
-                    "temperature": 0.0
-                }
+                generation_config = {"temperature": 0.0}
                 model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
                 
-                full_prompt = f"""
-                {prompt_intro}
+                full_prompt = """
+                Aşağıdaki Botanik eczane cari metnini/görselini incele ve sadece JSON formatında yanıt ver. 
                 
-                DİKKAT: HİÇBİR AÇIKLAMA YAZMA. MARKDOWN KULLANMA. 
-                Bana sadece ve sadece {{"hasta_adi": "..."}} ile başlayan geçerli bir JSON formatı döndür. Başında veya sonunda ```json gibi işaretler OLMASIN.
-                
-                BOTANİK PROGRAMI KURALLARI:
-                1. Veride hem "Reçetesi" hem de "Perakendesi" (elden satış) geçebilir. İkisini de "receteler" listesine blok olarak ekle.
-                2. Perakende işlemlerde kod kısmına "Perakende Satış" yaz. Muayene, reçete ve katılım payları 0.00'dır. Yalnızca hastanın ödediği net "Ödeme Toplam" kısmını 'yansiyan' değerine yaz.
-                3. Reçeteler için HESAPLAR satırındaki Hasta Katılım, Reçete Katılım, Muayene ve Fiyat Farkı toplamlarını alıp 'yansiyan' kısmına hastanın ödeyeceği toplam tutarı yaz.
-                4. "genel_bakiye" en sağ sütunda artarak giden (kümülatif) rakamın EN SONUNCUSUDUR.
+                ÖNEMLİ KURALLAR:
+                1. Her reçetenin başında yazan HASTA ADINI ('... Reçetesi' veya '... Perakendesi' yazan yerdeki isim) mutlaka her blok için ayrı yakala.
+                2. Her ilaç için ADET (Miktar) ve FİYAT (Birim fiyat veya Toplam fiyat) bilgilerini mutlaka çek.
+                3. "Fiyat Farkı" kısmını her ilaç için kontrol et, varsa çek.
+                4. Reçeteler için HESAPLAR satırındaki tutarları (Katılım Payları, Muayene, Reçete Payı) ayıkla.
+                5. "genel_bakiye" en sağ sütundaki son kümülatif rakamdır.
                 
                 JSON ŞEMASI:
-                {{
-                  "hasta_adi": "Hasta Adı Soyadı",
+                {
+                  "hasta_adi_genel": "Ana Hasta Adı",
                   "receteler": [
-                    {{
+                    {
                       "tarih": "GG.AA.YYYY",
-                      "kod": "Reçete Kodu veya Perakende",
+                      "hasta_adi_ozel": "Bu Reçetedeki İsim",
+                      "kod": "Reçete Kodu",
                       "ilaclar": [
-                        {{"ad": "İlaç Adı", "fiyat_farki": "0.00"}}
+                        {"ad": "İlaç Adı", "adet": "1", "fiyat": "0.00", "fiyat_farki": "0.00"}
                       ],
-                      "katilim_payi": "0.00",
-                      "muayene_ucreti": "0.00",
-                      "recete_payi": "0.00",
-                      "yansiyan": "0.00"
-                    }}
+                      "katilim_payi": "0.00", "muayene_ucreti": "0.00", "recete_payi": "0.00", "yansiyan": "0.00"
+                    }
                   ],
                   "genel_bakiye": "0.00"
-                }}
+                }
                 """
                 
                 response = model.generate_content([full_prompt] + content_to_send)
-                
-                # Gelen metni temizleyip JSON'a dönüştürme işlemi (Koruma katmanı)
-                raw_response = response.text
-                raw_response = raw_response.replace("```json", "").replace("```html", "").replace("```", "").strip()
-                
-                # Regex ile süslü parantezlerin dışındaki gereksiz metinleri traşlıyoruz
+                raw_response = response.text.replace("```json", "").replace("```", "").strip()
                 json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
-                if json_match:
-                    clean_json = json_match.group(0)
-                else:
-                    clean_json = raw_response
-                
-                data = json.loads(clean_json)
+                data = json.loads(json_match.group(0) if json_match else raw_response)
                 
                 inner_html = f"""
                 <div class="header">
                     <h1>Eczane Cari Kart Dökümü</h1>
-                    <div class="patient-name">{data.get('hasta_adi', 'Hasta Bilgisi Alınamadı')}</div>
+                    <div class="patient-name">{data.get('hasta_adi_genel', 'Hasta Bilgisi')}</div>
                 </div>
                 """
                 
                 for r in data.get('receteler', []):
                     inner_html += f"""
                     <div class="recete-block">
+                        <div class="recete-patient">Hasta: {r.get('hasta_adi_ozel', '')}</div>
                         <div class="recete-header">
                             <span class="date-tag">{r.get('tarih', '')}</span>
                             <span class="kod-tag">{r.get('kod', '')}</span>
@@ -206,15 +202,26 @@ with col2:
                     """
                     for ilac in r.get('ilaclar', []):
                         fark = str(ilac.get('fiyat_farki', '0.00'))
-                        fark_str = f"<span class='fark-info'>Fiyat Farkı: {fark} TL</span>" if fark not in ["0.00", "0,00", "0", "0.0", "", None] else ""
-                        inner_html += f"<div class='ilac-row'><span>{ilac.get('ad', '')}</span>{fark_str}</div>"
+                        fark_html = f"<span class='fark-info'>+ {fark} TL Fark</span>" if fark not in ["0.00", "0,00", "0", ""] else ""
+                        
+                        inner_html += f"""
+                        <div class="ilac-row">
+                            <div class="ilac-main">
+                                <span>{ilac.get('ad', '')}</span>
+                                <span>{ilac.get('fiyat', '0.00')} TL</span>
+                            </div>
+                            <div class="ilac-sub">
+                                <span>Adet: {ilac.get('adet', '1')}</span>
+                                {fark_html}
+                            </div>
+                        </div>
+                        """
                     
                     if "Perakende" in r.get('kod', ''):
                         inner_html += f"""
                         <div class="details-box">
-                            <div class="yansiyan-row"><span>Perakende / Nakit Tutar</span><span>{r.get('yansiyan', '0.00')} TL</span></div>
-                        </div>
-                        </div>
+                            <div class="yansiyan-row"><span>Perakende Tutar</span><span>{r.get('yansiyan', '0.00')} TL</span></div>
+                        </div></div>
                         """
                     else:
                         inner_html += f"""
@@ -223,8 +230,7 @@ with col2:
                             <div class="detail-line"><span>Muayene Ücreti</span><span>{r.get('muayene_ucreti', '0.00')} TL</span></div>
                             <div class="detail-line"><span>Reçete Payı</span><span>{r.get('recete_payi', '0.00')} TL</span></div>
                             <div class="yansiyan-row"><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0.00')} TL</span></div>
-                        </div>
-                        </div>
+                        </div></div>
                         """
                     
                 inner_html += f"""
@@ -233,14 +239,11 @@ with col2:
                 </div>
                 """
                 
-                final_html = TEMPLATE_TOP + inner_html + TEMPLATE_BOTTOM
+                st.success("⚡ Cari Kart Hazır!")
+                components.html(TEMPLATE_TOP + inner_html + TEMPLATE_BOTTOM, height=900, scrolling=True)
                 
-                st.success("⚡ Cari Kart Hızla Hazırlandı!")
-                components.html(final_html, height=900, scrolling=True)
-                
-            except json.JSONDecodeError:
-                st.error("⚠️ Veri okunurken bir anormallik oluştu. Lütfen butona tekrar basın.")
             except Exception as e:
-                st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
-    else:
-        st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
+                st.error(f"⚠️ Hata: {str(e)}")
+else:
+    st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
+```
