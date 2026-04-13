@@ -279,7 +279,7 @@ with col2:
                 try:
                     data = parse_botanik_text(raw_text)
                     final_html = generate_html(data)
-                    st.success("⚡ Şimşek Hızında Cari Kart Hazır!")
+                    st.success("⚡ Cari Kart Hazır!")
                     components.html(final_html, height=900, scrolling=True)
                 except Exception as e:
                     st.error(f"⚠️ Metin işlenirken hata oluştu: {str(e)}")
