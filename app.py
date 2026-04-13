@@ -57,6 +57,7 @@ TEMPLATE_TOP = """
         .fark-info { color: var(--fark); font-weight: bold; }
         .details-box { background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }
         .detail-line { display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }
+        .detail-fark { display: flex; justify-content: space-between; font-size: 12px; color: var(--fark); font-weight: bold; margin-bottom: 4px; padding-top: 4px; border-top: 1px dashed #eee; }
         .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
         .grand-footer { background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }
         .grand-footer .price { font-size: 28px; font-weight: bold; }
@@ -148,7 +149,7 @@ with col2:
                 1. Her reçetenin başında yazan HASTA ADINI ('... Reçetesi' veya '... Perakendesi' yazan yerdeki isim) mutlaka her blok için ayrı yakala.
                 2. Her ilaç için ADET (Miktar) ve FİYAT (Birim fiyat veya Toplam fiyat) bilgilerini mutlaka çek.
                 3. "Fiyat Farkı" kısmını her ilaç için kontrol et, varsa çek.
-                4. Reçeteler için HESAPLAR satırındaki tutarları (Katılım Payları, Muayene, Reçete Payı) ayıkla.
+                4. Reçeteler için HESAPLAR satırındaki tutarları (Katılım Payları, Muayene, Reçete Payı VE Fiyat Farkı Toplamı) eksiksiz ayıkla.
                 5. "genel_bakiye" en sağ sütundaki son kümülatif rakamdır.
                 
                 JSON ŞEMASI:
@@ -162,7 +163,11 @@ with col2:
                       "ilaclar": [
                         {"ad": "İlaç Adı", "adet": "1", "fiyat": "0.00", "fiyat_farki": "0.00"}
                       ],
-                      "katilim_payi": "0.00", "muayene_ucreti": "0.00", "recete_payi": "0.00", "yansiyan": "0.00"
+                      "katilim_payi": "0.00", 
+                      "muayene_ucreti": "0.00", 
+                      "recete_payi": "0.00", 
+                      "toplam_fark": "0.00", 
+                      "yansiyan": "0.00"
                     }
                   ],
                   "genel_bakiye": "0.00"
@@ -219,6 +224,7 @@ with col2:
                             <div class="detail-line"><span>Hasta Katılım Payı</span><span>{r.get('katilim_payi', '0.00')} TL</span></div>
                             <div class="detail-line"><span>Muayene Ücreti</span><span>{r.get('muayene_ucreti', '0.00')} TL</span></div>
                             <div class="detail-line"><span>Reçete Payı</span><span>{r.get('recete_payi', '0.00')} TL</span></div>
+                            <div class="detail-fark"><span>Toplam Fiyat Farkı</span><span>{r.get('toplam_fark', '0.00')} TL</span></div>
                             <div class="yansiyan-row"><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0.00')} TL</span></div>
                         </div></div>
                         """
