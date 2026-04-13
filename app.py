@@ -24,11 +24,10 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- ÖZEL BOTANİK METİN PARÇALAYICI (YAPAY ZEKASIZ, 0.01 SANİYE) ---
+# --- ÖZEL BOTANİK METİN PARÇALAYICI (KİLİTLİ SİSTEM - YAPAY ZEKASIZ, 0.01 SANİYE) ---
 def parse_botanik_text(text):
     data = {"hasta_adi_genel": "", "receteler": [], "genel_bakiye": "0,00"}
     
-    # Blokları tarihlerden böl (DD.MM.YYYY HH:MM)
     pattern = r'(?=\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2})'
     blocks = re.split(pattern, text.strip())
     blocks = [b.strip() for b in blocks if b.strip()]
@@ -43,11 +42,9 @@ def parse_botanik_text(text):
             "recete_payi": "0,00", "toplam_fark": "0,00", "yansiyan": "0,00"
         }
         
-        # Tarih
         tarih_match = re.search(r'\d{2}\.\d{2}\.\d{4}', header)
         recete['tarih'] = tarih_match.group(0) if tarih_match else ""
         
-        # İsim ve Tür
         isim_match = re.search(r'\d{2}:\d{2}\s+(.*?)\s+(Reçetesi|Perakendesi)', header)
         if isim_match:
             recete['hasta_adi_ozel'] = isim_match.group(1).strip()
@@ -61,12 +58,10 @@ def parse_botanik_text(text):
             kod_match = re.search(r'\(\d+\)\s+([A-Z0-9]+)', header)
             recete['kod'] = kod_match.group(1) if kod_match else ""
             
-        # Genel Bakiye (Header satırındaki en son sayı)
         nums = re.findall(r'\d+,\d{2}', header)
         if nums:
             data['genel_bakiye'] = nums[-1]
             
-        # İlaçları ve Hesapları bul
         hesaplar_idx = -1
         for i, line in enumerate(lines):
             if line.startswith("HESAPLAR"):
@@ -94,7 +89,6 @@ def parse_botanik_text(text):
                         recete['ilaclar'].append({"ad": isim, "adet": adet, "fiyat": fiyat, "fiyat_farki": fark})
                 except: pass
             
-            # Hesaplar Satırı
             if hesaplar_idx + 1 < len(lines):
                 hesap_satiri = lines[hesaplar_idx + 1]
                 if is_perakende:
@@ -111,7 +105,6 @@ def parse_botanik_text(text):
                     recete['muayene_ucreti'] = muayene.group(1) if muayene else "0,00"
                     recete['toplam_fark'] = f_fark.group(1) if f_fark else "0,00"
                     
-                    # Matematiksel Toplama (Yansıyan)
                     def parse_num(val): return float(val.replace('.', '').replace(',', '.'))
                     try:
                         yans = parse_num(recete['katilim_payi']) + parse_num(recete['muayene_ucreti']) + parse_num(recete['recete_payi']) + parse_num(recete['toplam_fark'])
@@ -122,76 +115,10 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML ŞABLONLARI ---
-TEMPLATE_TOP = """
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <style>
-        :root { --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }
-        body { font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 10px; color: var(--text); }
-        .action-buttons { display: flex; gap: 15px; margin-bottom: 20px; width: 100%; max-width: 500px; justify-content: center; }
-        .btn { border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; color: white; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s; }
-        .btn-print { background-color: #2980b9; }
-        .btn-print:hover { background-color: #1c5982; }
-        .btn-jpg { background-color: #27ae60; }
-        .btn-jpg:hover { background-color: #1e8449; }
-        .container { width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; }
-        .header { background: var(--primary); color: white; padding: 25px; text-align: left; }
-        .header h1 { margin: 0; font-size: 18px; opacity: 0.9; font-weight: 400; }
-        .patient-name { font-size: 22px; font-weight: bold; margin-top: 5px; }
-        .recete-block { padding: 20px; border-bottom: 8px solid var(--bg); }
-        .recete-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
-        .recete-patient { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 10px; display: block; }
-        .date-tag { font-weight: bold; color: var(--primary); font-size: 14px; }
-        .kod-tag { font-size: 11px; color: #999; border: 1px solid #eee; padding: 2px 6px; border-radius: 4px; }
-        
-        .ilac-row { padding: 10px 0; border-bottom: 1px dashed #f0f0f0; }
-        .ilac-main { display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; }
-        .ilac-sub { display: flex; justify-content: space-between; font-size: 11px; color: #777; margin-top: 2px; }
-        
-        .fark-info { color: var(--fark); font-weight: bold; }
-        .details-box { background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }
-        .detail-line { display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }
-        .detail-fark { display: flex; justify-content: space-between; font-size: 12px; color: var(--fark); font-weight: bold; margin-bottom: 4px; padding-top: 4px; border-top: 1px dashed #eee; }
-        .yansiyan-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }
-        .grand-footer { background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }
-        .grand-footer .price { font-size: 28px; font-weight: bold; }
-        @media print {
-            .action-buttons { display: none !important; }
-            body { padding: 0; background: white; }
-            .container { box-shadow: none; border: none; border-radius: 0; }
-        }
-    </style>
-</head>
-<body>
-    <div class="action-buttons no-print">
-        <button class="btn btn-print" onclick="window.print()">🖨️ Yazdır</button>
-        <button class="btn btn-jpg" onclick="downloadJPG()">📸 JPG İndir (WhatsApp)</button>
-    </div>
-    <div class="container" id="capture-area">
-"""
-
-TEMPLATE_BOTTOM = """
-    </div>
-    <script>
-        function downloadJPG() {
-            html2canvas(document.getElementById('capture-area'), { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
-                let link = document.createElement('a');
-                link.download = 'Eczane_Cari_Kart_Dokumu.jpg';
-                link.href = canvas.toDataURL('image/jpeg', 0.9);
-                link.click();
-            });
-        }
-    </script>
-</body>
-</html>
-"""
-
-# HTML Oluşturucu Fonksiyon
+# --- HTML OLUŞTURUCU FONKSİYON (Şablon Kilitli, Üst Bar Dinamik Eklendi) ---
 def generate_html(data):
+    hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
+    
     inner_html = f"""
     <div class="header">
         <h1>Eczane Cari Kart Dökümü</h1>
@@ -243,8 +170,119 @@ def generate_html(data):
         <span>Hastaya Yansıyan</span><span class="price">{data.get('genel_bakiye', '0,00')} TL</span>
     </div>
     """
-    return TEMPLATE_TOP + inner_html + TEMPLATE_BOTTOM
 
+    FULL_HTML = f"""
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+        <meta charset="UTF-8">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <style>
+            :root {{ --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }}
+            body {{ font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 0; color: var(--text); margin: 0; }}
+            
+            /* --- HAREKETSİZ SABİT ÜST BAR --- */
+            .sticky-bar {{ position: sticky; top: 0; z-index: 1000; background: #ffffff; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); border-bottom: 1px solid #eaeaea; margin-bottom: 20px; box-sizing: border-box; }}
+            .sticky-bar h2 {{ margin: 0; font-size: 18px; color: #333; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
+            .action-buttons {{ display: flex; gap: 10px; margin: 0; }}
+            
+            .btn {{ border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; color: white; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s; }}
+            .btn-print {{ background-color: #2980b9; }}
+            .btn-print:hover {{ background-color: #1c5982; }}
+            .btn-copy {{ background-color: #8e44ad; }}
+            .btn-copy:hover {{ background-color: #732d91; }}
+            .btn-jpg {{ background-color: #27ae60; }}
+            .btn-jpg:hover {{ background-color: #1e8449; }}
+
+            /* KİLİTLİ TASARIM (Capture Area) */
+            .container {{ width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; margin-bottom: 30px; }}
+            .header {{ background: var(--primary); color: white; padding: 25px; text-align: left; }}
+            .header h1 {{ margin: 0; font-size: 18px; opacity: 0.9; font-weight: 400; }}
+            .patient-name {{ font-size: 22px; font-weight: bold; margin-top: 5px; }}
+            .recete-block {{ padding: 20px; border-bottom: 8px solid var(--bg); }}
+            .recete-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #eee; }}
+            .recete-patient {{ font-size: 13px; font-weight: bold; color: #555; margin-bottom: 10px; display: block; }}
+            .date-tag {{ font-weight: bold; color: var(--primary); font-size: 14px; }}
+            .kod-tag {{ font-size: 11px; color: #999; border: 1px solid #eee; padding: 2px 6px; border-radius: 4px; }}
+            .ilac-row {{ padding: 10px 0; border-bottom: 1px dashed #f0f0f0; }}
+            .ilac-main {{ display: flex; justify-content: space-between; font-size: 13px; font-weight: 500; }}
+            .ilac-sub {{ display: flex; justify-content: space-between; font-size: 11px; color: #777; margin-top: 2px; }}
+            .fark-info {{ color: var(--fark); font-weight: bold; }}
+            .details-box {{ background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }}
+            .detail-line {{ display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }}
+            .detail-fark {{ display: flex; justify-content: space-between; font-size: 12px; color: var(--fark); font-weight: bold; margin-bottom: 4px; padding-top: 4px; border-top: 1px dashed #eee; }}
+            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }}
+            .grand-footer {{ background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }}
+            .grand-footer .price {{ font-size: 28px; font-weight: bold; }}
+            @media print {{
+                .sticky-bar {{ display: none !important; }}
+                body {{ padding: 0; background: white; margin: 0; }}
+                .container {{ box-shadow: none; border: none; border-radius: 0; margin-top: 0; }}
+            }}
+        </style>
+    </head>
+    <body>
+        
+        <div class="sticky-bar no-print">
+            <h2>🧾 Hastaya Verilecek Döküm</h2>
+            <div class="action-buttons">
+                <button class="btn btn-print" onclick="window.print()">🖨️ Yazdır</button>
+                <button class="btn btn-copy" onclick="copyImage()">📋 Kopyala</button>
+                <button class="btn btn-jpg" onclick="downloadJPG()">📸 İndir</button>
+            </div>
+        </div>
+
+        <div class="container" id="capture-area">
+            {inner_html}
+        </div>
+
+        <script>
+            // 1. Akıllı Dosya İsmi (Hasta Adı + Tarih)
+            function getFileName() {{
+                let d = new Date();
+                let dateStr = d.toLocaleDateString('tr-TR').replace(/\./g, '-');
+                return "{hasta_adi_dosya}_" + dateStr + ".jpg";
+            }}
+
+            // 2. JPG İndirme
+            function downloadJPG() {{
+                html2canvas(document.getElementById('capture-area'), {{ scale: 2, backgroundColor: "#ffffff" }}).then(canvas => {{
+                    let link = document.createElement('a');
+                    link.download = getFileName();
+                    link.href = canvas.toDataURL('image/jpeg', 0.9);
+                    link.click();
+                }});
+            }}
+
+            // 3. Panoya Kopyalama (CTRL+V İçin)
+            function copyImage() {{
+                let btn = document.querySelector('.btn-copy');
+                let originalText = btn.innerHTML;
+                btn.innerHTML = '⏳ Kopyalanıyor...';
+                
+                html2canvas(document.getElementById('capture-area'), {{ scale: 2, backgroundColor: "#ffffff" }}).then(canvas => {{
+                    canvas.toBlob(blob => {{
+                        try {{
+                            const item = new ClipboardItem({{ 'image/png': blob }});
+                            navigator.clipboard.write([item]).then(() => {{
+                                btn.innerHTML = '✅ Kopyalandı!';
+                                setTimeout(() => btn.innerHTML = originalText, 2500);
+                            }}).catch(err => {{
+                                alert('Kopyalama engellendi. Lütfen İndir butonunu kullanın.');
+                                btn.innerHTML = originalText;
+                            }});
+                        }} catch(e) {{
+                            alert('Tarayıcınız panoya direkt görsel kopyalamayı desteklemiyor. Lütfen İndir butonunu kullanın.');
+                            btn.innerHTML = originalText;
+                        }}
+                    }}, 'image/png');
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return FULL_HTML
 
 col1, col2 = st.columns([1, 2.5], gap="large")
 
@@ -270,22 +308,21 @@ with col1:
     submit_button = st.button("✨ Cari Kart Oluştur", type="primary", use_container_width=True)
 
 with col2:
-    st.subheader("🧾 2. Hastaya Verilecek Döküm")
+    # Başlığı HTML içindeki sabit bara taşıdığımız için hizalama amaçlı boş bıraktık
+    st.subheader(" ") 
     
     if submit_button:
         if raw_text.strip() != "":
-            # 🚀 METİN VARSA: %100 PYTHON İLE (0.01 SANİYE) YAPAY ZEKASIZ İŞLEM 🚀
             with st.spinner("🚀 Saf Yazılım Gücüyle Veriler Çekiliyor (Işık Hızı)..."):
                 try:
                     data = parse_botanik_text(raw_text)
                     final_html = generate_html(data)
-                    st.success("⚡ Cari Kart Hazır!")
+                    st.success("⚡ Şimşek Hızında Cari Kart Hazır!")
                     components.html(final_html, height=900, scrolling=True)
                 except Exception as e:
                     st.error(f"⚠️ Metin işlenirken hata oluştu: {str(e)}")
                     
         elif uploaded_file:
-            # 🐌 GÖRSEL VARSA: MECBUREN YAPAY ZEKA İLE (3-5 SANİYE) OKUMA 🐌
             with st.spinner("🤖 Görsel Yapay Zeka Tarafından Okunuyor (3-5 Sn Sürebilir)..."):
                 try:
                     img = Image.open(uploaded_file)
