@@ -115,7 +115,7 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON (Şablon Kilitli, Üst Bar Dinamik Eklendi) ---
+# --- HTML OLUŞTURUCU FONKSİYON ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     
@@ -181,9 +181,9 @@ def generate_html(data):
             :root {{ --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }}
             body {{ font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 0; color: var(--text); margin: 0; }}
             
-            /* --- HAREKETSİZ SABİT ÜST BAR --- */
-            .sticky-bar {{ position: sticky; top: 0; z-index: 1000; background: #ffffff; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); border-bottom: 1px solid #eaeaea; margin-bottom: 20px; box-sizing: border-box; }}
-            .sticky-bar h2 {{ margin: 0; font-size: 18px; color: #333; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
+            /* --- ARKA PLANI İPTAL EDİLMİŞ SABİT ÜST BAR --- */
+            .sticky-bar {{ position: sticky; top: 0; z-index: 1000; background: transparent; width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; padding: 10px 0; margin-bottom: 15px; box-sizing: border-box; }}
+            .sticky-bar h2 {{ margin: 0; font-size: 18px; color: var(--text); display: flex; align-items: center; gap: 8px; font-weight: 600; }}
             .action-buttons {{ display: flex; gap: 10px; margin: 0; }}
             
             .btn {{ border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; color: white; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s; }}
@@ -237,14 +237,12 @@ def generate_html(data):
         </div>
 
         <script>
-            // 1. Akıllı Dosya İsmi (Hasta Adı + Tarih)
             function getFileName() {{
                 let d = new Date();
                 let dateStr = d.toLocaleDateString('tr-TR').replace(/\./g, '-');
                 return "{hasta_adi_dosya}_" + dateStr + ".jpg";
             }}
 
-            // 2. JPG İndirme
             function downloadJPG() {{
                 html2canvas(document.getElementById('capture-area'), {{ scale: 2, backgroundColor: "#ffffff" }}).then(canvas => {{
                     let link = document.createElement('a');
@@ -254,7 +252,6 @@ def generate_html(data):
                 }});
             }}
 
-            // 3. Panoya Kopyalama (CTRL+V İçin)
             function copyImage() {{
                 let btn = document.querySelector('.btn-copy');
                 let originalText = btn.innerHTML;
@@ -308,7 +305,6 @@ with col1:
     submit_button = st.button("✨ Cari Kart Oluştur", type="primary", use_container_width=True)
 
 with col2:
-    # Başlığı HTML içindeki sabit bara taşıdığımız için hizalama amaçlı boş bıraktık
     st.subheader(" ") 
     
     if submit_button:
