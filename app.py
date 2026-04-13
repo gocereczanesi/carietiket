@@ -1,13 +1,3 @@
-Haklısın, Botanik dökümünde o bilgiler çok net görünüyor ve hastanın neye ne kadar ödediğini anlaması için adet ve fiyat bilgisi şart. Ayrıca her reçetenin başında isim yazdığı için, sistemin bu isimleri de doğru yakalayıp her bloğun içine işlemesi daha güvenli olur.
-
-İstediğin güncellemeleri yaptım:
-1.  **Adet ve Fiyat Eklendi:** Her ilacın yanında kaç adet olduğu ve birim fiyatı artık görünüyor.
-2.  **Kişiye Özel Reçete Takibi:** Her reçete bloğunun içine "Hasta:" alanı eklendi. Böylece dökümde farklı isimler varsa karıştırılmayacak.
-3.  **Hız ve Kilitlenme Koruması:** Mevcut yüksek hız ve kilitlenme koruması yapısı korundu.
-
-Lütfen `app.py` dosyanın içini tamamen silip bu en gelişmiş versiyonu yapıştır:
-
-```python
 import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
@@ -246,4 +236,3 @@ with col2:
                 st.error(f"⚠️ Hata: {str(e)}")
 else:
     st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
-```
