@@ -234,5 +234,5 @@ with col2:
                 
             except Exception as e:
                 st.error(f"⚠️ Hata: {str(e)}")
-else:
-    st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
+    else:
+        st.info("👈 Lütfen sol taraftan veriyi girip oluştur butonuna basın.")
