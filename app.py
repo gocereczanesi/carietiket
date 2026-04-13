@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
 import json
+import re
 from PIL import Image
 
 # Sayfa Ayarları
@@ -9,7 +10,7 @@ st.set_page_config(page_title="Eczane Cari Kart Dökümü", page_icon="💊", la
 
 st.title("💊 Eczane Cari Kart Dökümü")
 
-# Metin kutusunu temizleme fonksiyonu (Session State)
+# Metin kutusunu temizleme fonksiyonu
 if "raw_text_input" not in st.session_state:
     st.session_state["raw_text_input"] = ""
 
@@ -93,14 +94,12 @@ with col1:
     tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Görsel Yükle"])
 
     with tab1:
-        # --- BAŞLIK VE TEMİZLE BUTONU YAN YANA ---
         header_col, btn_col = st.columns([3, 1])
         with header_col:
             st.markdown("<p style='margin-top: 10px; margin-bottom: 0px; font-weight: bold;'>Botanik Verisini Yapıştırın:</p>", unsafe_allow_html=True)
         with btn_col:
             st.button("🗑️ Temizle", on_click=clear_text, use_container_width=True)
             
-        # Text area artık state'e bağlı çalışıyor
         raw_text = st.text_area("Gizli Label", key="raw_text_input", label_visibility="collapsed", height=250)
 
     with tab2:
@@ -135,23 +134,24 @@ with col2:
             st.warning("Lütfen işlem yapmadan önce sol taraftan bir metin girin veya dosya yükleyin.")
             st.stop()
 
-        with st.spinner("🚀 Veriler Botanik şablonuna göre işleniyor..."):
+        with st.spinner("🚀 Veriler işleniyor (Kilitlenme Koruması Aktif)..."):
             try:
+                # ⚡ KİLİTLENMEYE SEBEP OLAN MİME TİPİNİ KALDIRDIK. Sadece 0.0 temp bırakıyoruz.
                 generation_config = {
-                    "temperature": 0.0,
-                    "response_mime_type": "application/json"
+                    "temperature": 0.0
                 }
                 model = genai.GenerativeModel('gemini-2.5-flash', generation_config=generation_config)
                 
                 full_prompt = f"""
                 {prompt_intro}
                 
-                HİÇBİR AÇIKLAMA YAZMA. Sadece JSON formatında çıktı ver.
+                DİKKAT: HİÇBİR AÇIKLAMA YAZMA. MARKDOWN KULLANMA. 
+                Bana sadece ve sadece {{"hasta_adi": "..."}} ile başlayan geçerli bir JSON formatı döndür. Başında veya sonunda ```json gibi işaretler OLMASIN.
                 
                 BOTANİK PROGRAMI KURALLARI:
                 1. Veride hem "Reçetesi" hem de "Perakendesi" (elden satış) geçebilir. İkisini de "receteler" listesine blok olarak ekle.
                 2. Perakende işlemlerde kod kısmına "Perakende Satış" yaz. Muayene, reçete ve katılım payları 0.00'dır. Yalnızca hastanın ödediği net "Ödeme Toplam" kısmını 'yansiyan' değerine yaz.
-                3. Reçeteler için HESAPLAR satırındaki Hasta Katılım, Reçete Katılım, Muayene ve Fiyat Farkı toplamlarını alıp 'yansiyan' kısmına hastanın ödeyeceği tutarı yaz.
+                3. Reçeteler için HESAPLAR satırındaki Hasta Katılım, Reçete Katılım, Muayene ve Fiyat Farkı toplamlarını alıp 'yansiyan' kısmına hastanın ödeyeceği toplam tutarı yaz.
                 4. "genel_bakiye" en sağ sütunda artarak giden (kümülatif) rakamın EN SONUNCUSUDUR.
                 
                 JSON ŞEMASI:
@@ -175,7 +175,19 @@ with col2:
                 """
                 
                 response = model.generate_content([full_prompt] + content_to_send)
-                data = json.loads(response.text)
+                
+                # Gelen metni temizleyip JSON'a dönüştürme işlemi (Koruma katmanı)
+                raw_response = response.text
+                raw_response = raw_response.replace("```json", "").replace("```html", "").replace("```", "").strip()
+                
+                # Regex ile süslü parantezlerin dışındaki gereksiz metinleri traşlıyoruz
+                json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+                if json_match:
+                    clean_json = json_match.group(0)
+                else:
+                    clean_json = raw_response
+                
+                data = json.loads(clean_json)
                 
                 inner_html = f"""
                 <div class="header">
@@ -223,11 +235,11 @@ with col2:
                 
                 final_html = TEMPLATE_TOP + inner_html + TEMPLATE_BOTTOM
                 
-                st.success("⚡ Cari Kart Hazır!")
+                st.success("⚡ Cari Kart Hızla Hazırlandı!")
                 components.html(final_html, height=900, scrolling=True)
                 
             except json.JSONDecodeError:
-                st.error("⚠️ Veri işlenirken bir hata oluştu. Lütfen tekrar deneyin.")
+                st.error("⚠️ Veri okunurken bir anormallik oluştu. Lütfen butona tekrar basın.")
             except Exception as e:
                 st.error(f"Beklenmeyen bir hata oluştu: {str(e)}")
     else:
