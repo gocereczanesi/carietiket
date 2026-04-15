@@ -181,8 +181,25 @@ def generate_html(data):
             :root {{ --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }}
             body {{ font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 0; color: var(--text); margin: 0; }}
             
-            .sticky-bar {{ position: sticky; top: 0; z-index: 1000; background: transparent; width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; padding: 10px 0; margin-bottom: 15px; box-sizing: border-box; }}
-            .sticky-bar h2 {{ margin: 0; font-size: 18px; color: var(--text); display: flex; align-items: center; gap: 8px; font-weight: 600; }}
+            /* --- YENİ SARI KONTROL PANELİ BAR --- */
+            .sticky-bar {{ 
+                position: sticky; 
+                top: 0; 
+                z-index: 1000; 
+                background-color: #fff9c4; /* Yumuşak sarı uyarı rengi */
+                border: 1px solid #f2d06b; /* Kenarlık rengi */
+                border-radius: 12px; /* Oval köşeler */
+                width: 100%; 
+                max-width: 500px; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center; 
+                padding: 12px 18px; 
+                margin-bottom: 20px; 
+                box-sizing: border-box; 
+                box-shadow: 0 4px 10px rgba(0,0,0,0.05); /* Şık bir gölge */
+            }}
+            .sticky-bar h2 {{ margin: 0; font-size: 16px; color: #5c4d0c; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
             .action-buttons {{ display: flex; gap: 10px; margin: 0; }}
             
             .btn {{ border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; color: white; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s; }}
