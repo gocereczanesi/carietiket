@@ -181,7 +181,6 @@ def generate_html(data):
             :root {{ --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }}
             body {{ font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 0; color: var(--text); margin: 0; }}
             
-            /* --- ARKA PLANI İPTAL EDİLMİŞ SABİT ÜST BAR --- */
             .sticky-bar {{ position: sticky; top: 0; z-index: 1000; background: transparent; width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; padding: 10px 0; margin-bottom: 15px; box-sizing: border-box; }}
             .sticky-bar h2 {{ margin: 0; font-size: 18px; color: var(--text); display: flex; align-items: center; gap: 8px; font-weight: 600; }}
             .action-buttons {{ display: flex; gap: 10px; margin: 0; }}
@@ -194,8 +193,12 @@ def generate_html(data):
             .btn-jpg {{ background-color: #27ae60; }}
             .btn-jpg:hover {{ background-color: #1e8449; }}
 
-            /* KİLİTLİ TASARIM (Capture Area) */
-            .container {{ width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; margin-bottom: 30px; }}
+            .container {{ width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; margin-bottom: 30px; outline: none; }}
+            
+            /* Düzenleme modunda farenin imlecini yazım şekline dönüştür */
+            [contenteditable="true"] {{ cursor: text; }}
+            [contenteditable="true"]:focus {{ outline: none; }}
+
             .header {{ background: var(--primary); color: white; padding: 25px; text-align: left; }}
             .header h1 {{ margin: 0; font-size: 18px; opacity: 0.9; font-weight: 400; }}
             .patient-name {{ font-size: 22px; font-weight: bold; margin-top: 5px; }}
@@ -232,7 +235,7 @@ def generate_html(data):
             </div>
         </div>
 
-        <div class="container" id="capture-area">
+        <div class="container" id="capture-area" contenteditable="true" spellcheck="false">
             {inner_html}
         </div>
 
@@ -313,7 +316,7 @@ with col2:
                 try:
                     data = parse_botanik_text(raw_text)
                     final_html = generate_html(data)
-                    st.success("⚡ Şimşek Hızında Cari Kart Hazır!")
+                    st.success("⚡ Şimşek Hızında Cari Kart Hazır! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
                     components.html(final_html, height=900, scrolling=True)
                 except Exception as e:
                     st.error(f"⚠️ Metin işlenirken hata oluştu: {str(e)}")
@@ -362,7 +365,7 @@ with col2:
                     data = json.loads(json_match.group(0) if json_match else raw_response)
                     
                     final_html = generate_html(data)
-                    st.success("🤖 Yapay Zeka Okumayı Tamamladı, Kart Hazır!")
+                    st.success("🤖 Yapay Zeka Okumayı Tamamladı! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
                     components.html(final_html, height=900, scrolling=True)
                 except Exception as e:
                     st.error(f"⚠️ Görsel okunurken hata oluştu: {str(e)}")
