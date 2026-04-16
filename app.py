@@ -24,6 +24,32 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
+# --- YENİ EKLENEN MATEMATİKSEL TOPLAMA FONKSİYONU (DENEME 2) ---
+def hesapla_genel_bakiye(data):
+    toplam_genel = 0.0
+    for r in data.get('receteler', []):
+        yans_str = str(r.get('yansiyan', '0,00'))
+        try:
+            # Noktaları sil (binlik ayırıcı), virgülü noktaya çevir (ondalık)
+            val = float(yans_str.replace('.', '').replace(',', '.'))
+            toplam_genel += val
+        except:
+            pass
+            
+    # Türk Lirası formatına çevirme (Örn: 1.234,56)
+    parts = f"{toplam_genel:.2f}".split('.')
+    tam_kisim = parts[0]
+    ondalik_kisim = parts[1]
+    
+    tam_kisim_fmt = ""
+    for i, digit in enumerate(reversed(tam_kisim)):
+        if i > 0 and i % 3 == 0 and tam_kisim[0] != '-':
+            tam_kisim_fmt = '.' + tam_kisim_fmt
+        tam_kisim_fmt = digit + tam_kisim_fmt
+        
+    data['genel_bakiye'] = f"{tam_kisim_fmt},{ondalik_kisim}"
+    return data
+
 # --- ÖZEL BOTANİK METİN PARÇALAYICI (KİLİTLİ SİSTEM - YAPAY ZEKASIZ, 0.01 SANİYE) ---
 def parse_botanik_text(text):
     data = {"hasta_adi_genel": "", "receteler": [], "genel_bakiye": "0,00"}
@@ -58,9 +84,7 @@ def parse_botanik_text(text):
             kod_match = re.search(r'\(\d+\)\s+([A-Z0-9]+)', header)
             recete['kod'] = kod_match.group(1) if kod_match else ""
             
-        nums = re.findall(r'\d+,\d{2}', header)
-        if nums:
-            data['genel_bakiye'] = nums[-1]
+        # Deneme 2: Header'dan genel bakiye okumayı iptal ettik, çünkü kendi hesaplıyor.
             
         hesaplar_idx = -1
         for i, line in enumerate(lines):
@@ -186,9 +210,9 @@ def generate_html(data):
                 position: sticky; 
                 top: 0; 
                 z-index: 1000; 
-                background-color: #fff9c4; /* Yumuşak sarı uyarı rengi */
-                border: 1px solid #f2d06b; /* Kenarlık rengi */
-                border-radius: 12px; /* Oval köşeler */
+                background-color: #fff9c4;
+                border: 1px solid #f2d06b;
+                border-radius: 12px;
                 width: 100%; 
                 max-width: 500px; 
                 display: flex; 
@@ -197,7 +221,7 @@ def generate_html(data):
                 padding: 12px 18px; 
                 margin-bottom: 20px; 
                 box-sizing: border-box; 
-                box-shadow: 0 4px 10px rgba(0,0,0,0.05); /* Şık bir gölge */
+                box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             }}
             .sticky-bar h2 {{ margin: 0; font-size: 16px; color: #5c4d0c; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
             .action-buttons {{ display: flex; gap: 10px; margin: 0; }}
@@ -332,6 +356,7 @@ with col2:
             with st.spinner("🚀 Saf Yazılım Gücüyle Veriler Çekiliyor (Işık Hızı)..."):
                 try:
                     data = parse_botanik_text(raw_text)
+                    data = hesapla_genel_bakiye(data) # DENEME 2: Matematiksel Toplama
                     final_html = generate_html(data)
                     st.success("⚡ Şimşek Hızında Cari Kart Hazır! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
                     components.html(final_html, height=900, scrolling=True)
@@ -352,7 +377,7 @@ with col2:
                     2. Her ilaç için ADET (Miktar) ve FİYAT (Birim fiyat veya Toplam fiyat) bilgilerini mutlaka çek.
                     3. "Fiyat Farkı" kısmını her ilaç için kontrol et, varsa çek.
                     4. Reçeteler için HESAPLAR satırındaki tutarları (Katılım Payları, Muayene, Reçete Payı VE Fiyat Farkı Toplamı) eksiksiz ayıkla.
-                    5. "genel_bakiye" en sağ sütundaki son kümülatif rakamdır (Hastanın toplam ödeyeceği tutar).
+                    5. En alttaki genel bakiyeyi SEN HESAPLAMA, sadece boş "0.00" ver, sistem kendi hesaplayacak.
                     
                     JSON ŞEMASI:
                     {
@@ -381,6 +406,7 @@ with col2:
                     json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                     data = json.loads(json_match.group(0) if json_match else raw_response)
                     
+                    data = hesapla_genel_bakiye(data) # DENEME 2: Matematiksel Toplama
                     final_html = generate_html(data)
                     st.success("🤖 Yapay Zeka Okumayı Tamamladı! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
                     components.html(final_html, height=900, scrolling=True)
