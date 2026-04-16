@@ -135,7 +135,7 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON (Tasarım İstekleri Buraya Uygulandı) ---
+# --- HTML OLUŞTURUCU FONKSİYON ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     
@@ -156,7 +156,6 @@ def generate_html(data):
         """
         for ilac in r.get('ilaclar', []):
             fark = str(ilac.get('fiyat_farki', '0,00'))
-            # İlaç içi turuncu fark rengi kilitli, aynen kaldı.
             fark_html = f"<span class='fark-info'>+ {fark} TL Fark</span>" if fark not in ["0.00", "0,00", "0", ""] else ""
             inner_html += f"""
             <div class="ilac-row">
@@ -216,19 +215,19 @@ def generate_html(data):
             .btn-jpg {{ background-color: #27ae60; }}
             .btn-jpg:hover {{ background-color: #1e8449; }}
 
-            /* 3. İSTEK: Resim arkasına beyaz fon ve paylar (Padding) */
+            /* 1. İSTEK: Beyaz fonun paylarını artır (25px -> 50px) */
             .capture-wrapper {{ 
                 background-color: #ffffff; /* Saf beyaz fon */
-                padding: 25px; /* Dört bir yandan 25px pay */
-                border-radius: 20px; /* Dış beyaz fonun köşelerini de oval yapalım şık dursun */
-                max-width: 550px; /* 500px kart + 50px padding */
+                padding: 50px; /* MOD: Dört bir yandan 50px pay */
+                border-radius: 20px; 
+                max-width: 600px; /* 500px kart + 100px padding */
                 margin-bottom: 30px;
                 display: flex;
                 justify-content: center;
                 align-items: center;
             }}
 
-            .container {{ width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; outline: none; margin: 0; /* Wrapper içinde margin olmamalı */ }}
+            .container {{ width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; outline: none; margin: 0; }}
             [contenteditable="true"] {{ cursor: text; }}
             [contenteditable="true"]:focus {{ outline: none; }}
 
@@ -247,18 +246,14 @@ def generate_html(data):
             .details-box {{ background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }}
             .detail-line {{ display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }}
             
-            /* 1. İSTEK CSS: Koyu Gri, Kalın, Fiyat Farkı */
-            .detail-fark {{ display: flex; justify-content: space-between; font-size: 12px; color: #444; /* Koyu Gri */ font-weight: bold; /* Kalın */ margin-bottom: 4px; padding-top: 4px; border-top: 1px dashed #eee; }}
+            .detail-fark {{ display: flex; justify-content: space-between; font-size: 12px; color: #444; font-weight: bold; margin-bottom: 4px; padding-top: 4px; border-top: 1px dashed #eee; }}
+            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }}
             
-            /* 2. İSTEK CSS: Kalın Hastaya Yansıyan Satırı */
-            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; /* Kalın */ color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }}
-            
-            .grand-footer {{ background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; /* 2. İsteğe destek */ }}
+            .grand-footer {{ background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }}
             .grand-footer .price {{ font-size: 28px; font-weight: bold; }}
             @media print {{
                 .sticky-bar {{ display: none !important; }}
                 body {{ padding: 0; background: white; margin: 0; }}
-                /* Yazdırırken beyaz fon ve payları kaldıralım kağıt zaten beyaz */
                 .capture-wrapper {{ background: none; padding: 0; max-width: 100%; border-radius: 0; }}
                 .container {{ box-shadow: none; border: none; border-radius: 0; margin-top: 0; max-width: 100%; }}
             }}
@@ -289,11 +284,17 @@ def generate_html(data):
             }}
 
             function downloadJPG() {{
-                // Kilitli kural: html2canvas wrapper'ın fotoğrafını çekiyor
-                html2canvas(document.getElementById('capture-area'), {{ scale: 2, backgroundColor: "#ffffff" }}).then(canvas => {{
+                // 2. İSTEK: Pikselleşme Çözümü (scale: 2 -> scale: 4)
+                html2canvas(document.getElementById('capture-area'), {{ 
+                    scale: 4,  // MOD: Ultra Yüksek Çözünürlük (4 Kat Kaliteli)
+                    backgroundColor: "#ffffff",
+                    imageTimeout: 0,
+                    logging: false,
+                    useCORS: true
+                }}).then(canvas => {{
                     let link = document.createElement('a');
                     link.download = getFileName();
-                    link.href = canvas.toDataURL('image/jpeg', 0.9);
+                    link.href = canvas.toDataURL('image/jpeg', 1.0); // En yüksek kalite (1.0)
                     link.click();
                 }});
             }}
@@ -303,7 +304,12 @@ def generate_html(data):
                 let originalText = btn.innerHTML;
                 btn.innerHTML = '⏳ Kopyalanıyor...';
                 
-                html2canvas(document.getElementById('capture-area'), {{ scale: 2, backgroundColor: "#ffffff" }}).then(canvas => {{
+                // 2. İSTEK: Kopyalama için de Pikselleşme Çözümü
+                html2canvas(document.getElementById('capture-area'), {{ 
+                    scale: 4, // MOD: Ultra Yüksek Çözünürlük
+                    backgroundColor: "#ffffff",
+                    useCORS: true
+                }}).then(canvas => {{
                     canvas.toBlob(blob => {{
                         try {{
                             const item = new ClipboardItem({{ 'image/png': blob }});
@@ -318,7 +324,7 @@ def generate_html(data):
                             alert('Tarayıcınız panoya direkt görsel kopyalamayı desteklemiyor. Lütfen İndir butonunu kullanın.');
                             btn.innerHTML = originalText;
                         }}
-                    }}, 'image/png');
+                    }}, 'image/png', 1.0); // En yüksek kalite
                 }});
             }}
         </script>
@@ -361,7 +367,8 @@ with col2:
                     data = hesapla_genel_bakiye(data) # KİLİTLİ MATEMATİK MOTORU
                     final_html = generate_html(data)
                     st.success("⚡ Şimşek Hızında Cari Kart Hazır! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
-                    components.html(final_html, height=1000, scrolling=True) # Yükseklik padding nedeniyle biraz artırıldı
+                    # Padding artışı nedeniyle iframe yüksekliği biraz artırıldı
+                    components.html(final_html, height=1100, scrolling=True) 
                 except Exception as e:
                     st.error(f"⚠️ Metin işlenirken hata oluştu: {str(e)}")
                     
@@ -411,7 +418,8 @@ with col2:
                     data = hesapla_genel_bakiye(data) # KİLİTLİ MATEMATİK MOTORU
                     final_html = generate_html(data)
                     st.success("🤖 Yapay Zeka Okumayı Tamamladı! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
-                    components.html(final_html, height=1000, scrolling=True)
+                    # Padding artışı nedeniyle iframe yüksekliği biraz artırıldı
+                    components.html(final_html, height=1100, scrolling=True)
                 except Exception as e:
                     st.error(f"⚠️ Görsel okunurken hata oluştu: {str(e)}")
         else:
