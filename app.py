@@ -24,19 +24,17 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- YENİ EKLENEN MATEMATİKSEL TOPLAMA FONKSİYONU (DENEME 2) ---
+# --- YENİ EKLENEN MATEMATİKSEL TOPLAMA FONKSİYONU (DENEME 2 - KİLİTLİ) ---
 def hesapla_genel_bakiye(data):
     toplam_genel = 0.0
     for r in data.get('receteler', []):
         yans_str = str(r.get('yansiyan', '0,00'))
         try:
-            # Noktaları sil (binlik ayırıcı), virgülü noktaya çevir (ondalık)
             val = float(yans_str.replace('.', '').replace(',', '.'))
             toplam_genel += val
         except:
             pass
             
-    # Türk Lirası formatına çevirme (Örn: 1.234,56)
     parts = f"{toplam_genel:.2f}".split('.')
     tam_kisim = parts[0]
     ondalik_kisim = parts[1]
@@ -83,8 +81,6 @@ def parse_botanik_text(text):
         else:
             kod_match = re.search(r'\(\d+\)\s+([A-Z0-9]+)', header)
             recete['kod'] = kod_match.group(1) if kod_match else ""
-            
-        # Deneme 2: Header'dan genel bakiye okumayı iptal ettik, çünkü kendi hesaplıyor.
             
         hesaplar_idx = -1
         for i, line in enumerate(lines):
@@ -139,7 +135,7 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON ---
+# --- HTML OLUŞTURUCU FONKSİYON (Tasarım İstekleri Buraya Uygulandı) ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     
@@ -160,6 +156,7 @@ def generate_html(data):
         """
         for ilac in r.get('ilaclar', []):
             fark = str(ilac.get('fiyat_farki', '0,00'))
+            # İlaç içi turuncu fark rengi kilitli, aynen kaldı.
             fark_html = f"<span class='fark-info'>+ {fark} TL Fark</span>" if fark not in ["0.00", "0,00", "0", ""] else ""
             inner_html += f"""
             <div class="ilac-row">
@@ -185,7 +182,7 @@ def generate_html(data):
                 <div class="detail-line"><span>Hasta Katılım Payı</span><span>{r.get('katilim_payi', '0,00')} TL</span></div>
                 <div class="detail-line"><span>Muayene Ücreti</span><span>{r.get('muayene_ucreti', '0,00')} TL</span></div>
                 <div class="detail-line"><span>Reçete Payı</span><span>{r.get('recete_payi', '0,00')} TL</span></div>
-                <div class="detail-fark"><span>Toplam Fiyat Farkı</span><span>{r.get('toplam_fark', '0,00')} TL</span></div>
+                <div class="detail-fark"><span>Fiyat Farkı</span><span>{r.get('toplam_fark', '0,00')} TL</span></div>
                 <div class="yansiyan-row"><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0,00')} TL</span></div>
             </div></div>
             """
@@ -205,23 +202,8 @@ def generate_html(data):
             :root {{ --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }}
             body {{ font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 0; color: var(--text); margin: 0; }}
             
-            /* --- YENİ SARI KONTROL PANELİ BAR --- */
             .sticky-bar {{ 
-                position: sticky; 
-                top: 0; 
-                z-index: 1000; 
-                background-color: #fff9c4;
-                border: 1px solid #f2d06b;
-                border-radius: 12px;
-                width: 100%; 
-                max-width: 500px; 
-                display: flex; 
-                justify-content: space-between; 
-                align-items: center; 
-                padding: 12px 18px; 
-                margin-bottom: 20px; 
-                box-sizing: border-box; 
-                box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+                position: sticky; top: 0; z-index: 1000; background-color: #fff9c4; border: 1px solid #f2d06b; border-radius: 12px; width: 100%; max-width: 500px; display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; margin-bottom: 20px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             }}
             .sticky-bar h2 {{ margin: 0; font-size: 16px; color: #5c4d0c; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
             .action-buttons {{ display: flex; gap: 10px; margin: 0; }}
@@ -234,9 +216,19 @@ def generate_html(data):
             .btn-jpg {{ background-color: #27ae60; }}
             .btn-jpg:hover {{ background-color: #1e8449; }}
 
-            .container {{ width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; margin-bottom: 30px; outline: none; }}
-            
-            /* Düzenleme modunda farenin imlecini yazım şekline dönüştür */
+            /* 3. İSTEK: Resim arkasına beyaz fon ve paylar (Padding) */
+            .capture-wrapper {{ 
+                background-color: #ffffff; /* Saf beyaz fon */
+                padding: 25px; /* Dört bir yandan 25px pay */
+                border-radius: 20px; /* Dış beyaz fonun köşelerini de oval yapalım şık dursun */
+                max-width: 550px; /* 500px kart + 50px padding */
+                margin-bottom: 30px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }}
+
+            .container {{ width: 100%; max-width: 500px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; outline: none; margin: 0; /* Wrapper içinde margin olmamalı */ }}
             [contenteditable="true"] {{ cursor: text; }}
             [contenteditable="true"]:focus {{ outline: none; }}
 
@@ -254,14 +246,21 @@ def generate_html(data):
             .fark-info {{ color: var(--fark); font-weight: bold; }}
             .details-box {{ background: #f9fdfc; padding: 12px; margin-top: 10px; border-radius: 10px; border: 1px solid #edf5f4; }}
             .detail-line {{ display: flex; justify-content: space-between; font-size: 11.5px; color: #666; margin-bottom: 4px; }}
-            .detail-fark {{ display: flex; justify-content: space-between; font-size: 12px; color: var(--fark); font-weight: bold; margin-bottom: 4px; padding-top: 4px; border-top: 1px dashed #eee; }}
-            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }}
-            .grand-footer {{ background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; }}
+            
+            /* 1. İSTEK CSS: Koyu Gri, Kalın, Fiyat Farkı */
+            .detail-fark {{ display: flex; justify-content: space-between; font-size: 12px; color: #444; /* Koyu Gri */ font-weight: bold; /* Kalın */ margin-bottom: 4px; padding-top: 4px; border-top: 1px dashed #eee; }}
+            
+            /* 2. İSTEK CSS: Kalın Hastaya Yansıyan Satırı */
+            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; /* Kalın */ color: #27ae60; margin-top: 8px; padding-top: 8px; border-top: 1px solid #d1e8e5; }}
+            
+            .grand-footer {{ background: var(--primary); color: white; padding: 25px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; /* 2. İsteğe destek */ }}
             .grand-footer .price {{ font-size: 28px; font-weight: bold; }}
             @media print {{
                 .sticky-bar {{ display: none !important; }}
                 body {{ padding: 0; background: white; margin: 0; }}
-                .container {{ box-shadow: none; border: none; border-radius: 0; margin-top: 0; }}
+                /* Yazdırırken beyaz fon ve payları kaldıralım kağıt zaten beyaz */
+                .capture-wrapper {{ background: none; padding: 0; max-width: 100%; border-radius: 0; }}
+                .container {{ box-shadow: none; border: none; border-radius: 0; margin-top: 0; max-width: 100%; }}
             }}
         </style>
     </head>
@@ -276,8 +275,10 @@ def generate_html(data):
             </div>
         </div>
 
-        <div class="container" id="capture-area" contenteditable="true" spellcheck="false">
-            {inner_html}
+        <div class="capture-wrapper" id="capture-area">
+            <div class="container" contenteditable="true" spellcheck="false">
+                {inner_html}
+            </div>
         </div>
 
         <script>
@@ -288,6 +289,7 @@ def generate_html(data):
             }}
 
             function downloadJPG() {{
+                // Kilitli kural: html2canvas wrapper'ın fotoğrafını çekiyor
                 html2canvas(document.getElementById('capture-area'), {{ scale: 2, backgroundColor: "#ffffff" }}).then(canvas => {{
                     let link = document.createElement('a');
                     link.download = getFileName();
@@ -356,10 +358,10 @@ with col2:
             with st.spinner("🚀 Saf Yazılım Gücüyle Veriler Çekiliyor (Işık Hızı)..."):
                 try:
                     data = parse_botanik_text(raw_text)
-                    data = hesapla_genel_bakiye(data) # DENEME 2: Matematiksel Toplama
+                    data = hesapla_genel_bakiye(data) # KİLİTLİ MATEMATİK MOTORU
                     final_html = generate_html(data)
                     st.success("⚡ Şimşek Hızında Cari Kart Hazır! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
-                    components.html(final_html, height=900, scrolling=True)
+                    components.html(final_html, height=1000, scrolling=True) # Yükseklik padding nedeniyle biraz artırıldı
                 except Exception as e:
                     st.error(f"⚠️ Metin işlenirken hata oluştu: {str(e)}")
                     
@@ -406,10 +408,10 @@ with col2:
                     json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                     data = json.loads(json_match.group(0) if json_match else raw_response)
                     
-                    data = hesapla_genel_bakiye(data) # DENEME 2: Matematiksel Toplama
+                    data = hesapla_genel_bakiye(data) # KİLİTLİ MATEMATİK MOTORU
                     final_html = generate_html(data)
                     st.success("🤖 Yapay Zeka Okumayı Tamamladı! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
-                    components.html(final_html, height=900, scrolling=True)
+                    components.html(final_html, height=1000, scrolling=True)
                 except Exception as e:
                     st.error(f"⚠️ Görsel okunurken hata oluştu: {str(e)}")
         else:
