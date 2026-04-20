@@ -141,7 +141,7 @@ def generate_html(data):
     
     inner_html = f"""
     <div class="header">
-        <h1>Eczane Cari Kart Dökümü</h1>
+        <h1>REÇETENİZ HAZIR</h1>
         <div class="patient-name">{data.get('hasta_adi_genel', 'Hasta Bilgisi')}</div>
     </div>
     """
@@ -215,12 +215,11 @@ def generate_html(data):
             .btn-jpg {{ background-color: #27ae60; }}
             .btn-jpg:hover {{ background-color: #1e8449; }}
 
-            /* 1. İSTEK: Beyaz fonun paylarını artır (25px -> 50px) */
             .capture-wrapper {{ 
-                background-color: #ffffff; /* Saf beyaz fon */
-                padding: 50px; /* MOD: Dört bir yandan 50px pay */
+                background-color: #ffffff;
+                padding: 50px;
                 border-radius: 20px; 
-                max-width: 600px; /* 500px kart + 100px padding */
+                max-width: 600px;
                 margin-bottom: 30px;
                 display: flex;
                 justify-content: center;
@@ -284,9 +283,8 @@ def generate_html(data):
             }}
 
             function downloadJPG() {{
-                // 2. İSTEK: Pikselleşme Çözümü (scale: 2 -> scale: 4)
                 html2canvas(document.getElementById('capture-area'), {{ 
-                    scale: 4,  // MOD: Ultra Yüksek Çözünürlük (4 Kat Kaliteli)
+                    scale: 4, 
                     backgroundColor: "#ffffff",
                     imageTimeout: 0,
                     logging: false,
@@ -294,7 +292,7 @@ def generate_html(data):
                 }}).then(canvas => {{
                     let link = document.createElement('a');
                     link.download = getFileName();
-                    link.href = canvas.toDataURL('image/jpeg', 1.0); // En yüksek kalite (1.0)
+                    link.href = canvas.toDataURL('image/jpeg', 1.0);
                     link.click();
                 }});
             }}
@@ -304,9 +302,8 @@ def generate_html(data):
                 let originalText = btn.innerHTML;
                 btn.innerHTML = '⏳ Kopyalanıyor...';
                 
-                // 2. İSTEK: Kopyalama için de Pikselleşme Çözümü
                 html2canvas(document.getElementById('capture-area'), {{ 
-                    scale: 4, // MOD: Ultra Yüksek Çözünürlük
+                    scale: 4,
                     backgroundColor: "#ffffff",
                     useCORS: true
                 }}).then(canvas => {{
@@ -324,7 +321,7 @@ def generate_html(data):
                             alert('Tarayıcınız panoya direkt görsel kopyalamayı desteklemiyor. Lütfen İndir butonunu kullanın.');
                             btn.innerHTML = originalText;
                         }}
-                    }}, 'image/png', 1.0); // En yüksek kalite
+                    }}, 'image/png', 1.0);
                 }});
             }}
         </script>
@@ -364,10 +361,9 @@ with col2:
             with st.spinner("🚀 Saf Yazılım Gücüyle Veriler Çekiliyor (Işık Hızı)..."):
                 try:
                     data = parse_botanik_text(raw_text)
-                    data = hesapla_genel_bakiye(data) # KİLİTLİ MATEMATİK MOTORU
+                    data = hesapla_genel_bakiye(data) 
                     final_html = generate_html(data)
                     st.success("⚡ Şimşek Hızında Cari Kart Hazır! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
-                    # Padding artışı nedeniyle iframe yüksekliği biraz artırıldı
                     components.html(final_html, height=1100, scrolling=True) 
                 except Exception as e:
                     st.error(f"⚠️ Metin işlenirken hata oluştu: {str(e)}")
@@ -415,10 +411,9 @@ with col2:
                     json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
                     data = json.loads(json_match.group(0) if json_match else raw_response)
                     
-                    data = hesapla_genel_bakiye(data) # KİLİTLİ MATEMATİK MOTORU
+                    data = hesapla_genel_bakiye(data)
                     final_html = generate_html(data)
                     st.success("🤖 Yapay Zeka Okumayı Tamamladı! 💡 İPUCU: Kartın üzerindeki yazılara tıklayarak anında düzenleyebilirsiniz.")
-                    # Padding artışı nedeniyle iframe yüksekliği biraz artırıldı
                     components.html(final_html, height=1100, scrolling=True)
                 except Exception as e:
                     st.error(f"⚠️ Görsel okunurken hata oluştu: {str(e)}")
