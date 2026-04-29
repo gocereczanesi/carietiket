@@ -48,47 +48,59 @@ def hesapla_genel_bakiye(data):
     data['genel_bakiye'] = f"{tam_kisim_fmt},{ondalik_kisim}"
     return data
 
-# --- HİBRİT BOTANİK METİN PARÇALAYICI (DENEME 3) ---
+# --- HİBRİT BOTANİK METİN PARÇALAYICI (DENEME 3 - GÜNCEL) ---
 def parse_botanik_text(text):
     data = {"hasta_adi_genel": "", "receteler": [], "genel_bakiye": "0,00"}
     
-    # FORMAT B (ÖZET FİŞ) KONTROLÜ: "Syn:" veya "Tahsilat Tutarı" varsa
-    if "Syn:" in text or "Tahsilat Tutarı:" in text:
-        # Bloklara bölme (Eğer birden fazla özet peş peşe yapıştırılırsa)
-        blocks = re.split(r'(?=Syn:)', text.strip())
+    # FORMAT C (YENİ HASTA BİLGİLENDİRME FİŞİ) KONTROLÜ
+    if "Sayın :" in text and "Tc Kimlik No:" in text:
+        blocks = re.split(r'(?=Sayın\s*:)', text.strip())
         blocks = [b.strip() for b in blocks if b.strip()]
         
         for block in blocks:
             recete = {
                 "ilaclar": [], "katilim_payi": "0,00", "muayene_ucreti": "0,00", 
-                "recete_payi": "0,00", "toplam_fark": "0,00", "yansiyan": "0,00", "kod": "Reçete Özeti"
+                "recete_payi": "0,00", "toplam_fark": "0,00", "yansiyan": "0,00", "kod": "Reçete Bilgisi"
             }
             
             # Hasta Adı
-            isim_m = re.search(r'Syn:\s*(.*?)(?=\t|\s{2,}|[0-9]{2}-)', block)
+            isim_m = re.search(r'Sayın\s*:\s*(.*?)(?=Tc Kimlik)', block)
             if isim_m:
                 recete['hasta_adi_ozel'] = isim_m.group(1).strip()
                 if not data["hasta_adi_genel"]: data["hasta_adi_genel"] = recete['hasta_adi_ozel']
             
-            # Tarih
-            tarih_m = re.search(r'\d{2}-\d{2}-\d{4}', block)
-            recete['tarih'] = tarih_m.group(0).replace('-', '.') if tarih_m else ""
+            # Tarih (İşlem Tarihi)
+            tarih_m = re.search(r'İşlem Tarihi:.*?\s+(\d{2}-\d{2}-\d{4})', block)
+            recete['tarih'] = tarih_m.group(1).replace('-', '.') if tarih_m else ""
             
-            # Borç Kalemleri
+            # Genel Hesaplar
             fark_m = re.search(r'Fiyat Farkı\s+([\d,.]+)', block)
             mua_m = re.search(r'Muayene Katkı Payı\s+([\d,.]+)', block)
-            rx_pay_m = re.search(r'Tutar - Matrahsız\s*:\s*([\d,.]+)', block) # Özet fişte bu genelde reçete payıdır
-            tahsilat_m = re.search(r'Tahsilat Tutarı:\s*([\d,.]+)', block)
+            tahsilat_m = re.search(r'Ödenecek Toplam\s+([\d,.]+)', block)
             
             if fark_m: recete['toplam_fark'] = fark_m.group(1)
             if mua_m: recete['muayene_ucreti'] = mua_m.group(1)
-            if rx_pay_m: recete['recete_payi'] = rx_pay_m.group(1)
             if tahsilat_m: recete['yansiyan'] = tahsilat_m.group(1)
+
+            # İlaçları Ayıkla
+            # İlaçlar "Doktor :" ile "Rx Kat.Pay" arasındadır
+            drug_section = re.search(r'Doktor\s*:.*?\n(.*?)(?=Rx Kat\.Pay)', block, re.DOTALL)
+            if drug_section:
+                drug_text = drug_section.group(1)
+                # İlaç satırlarını yakala: İsim + Doz ... Alt satırda Adet + Fark
+                drug_matches = re.finditer(r'(.*?)\s+Doz.*?\n.*?\)\s+(\d+)\s+([\d,.]+)', drug_text)
+                for m in drug_matches:
+                    recete['ilaclar'].append({
+                        "ad": m.group(1).strip(),
+                        "adet": m.group(2).strip(),
+                        "fiyat": "0,00", # Bu formatta birim fiyat yok
+                        "fiyat_farki": m.group(3).strip()
+                    })
             
             data['receteler'].append(recete)
         return data
 
-    # FORMAT A (DETAYLI BOTANİK) - Eski kilitli sistem
+    # FORMAT A (DETAYLI BOTANİK)
     pattern = r'(?=\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2})'
     blocks = re.split(pattern, text.strip())
     blocks = [b.strip() for b in blocks if b.strip()]
@@ -143,7 +155,7 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON ---
+# --- HTML OLUŞTURUCU FONKSİYON (KİLİTLİ TASARIM) ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     inner_html = f"""
