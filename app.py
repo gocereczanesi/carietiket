@@ -184,7 +184,7 @@ def generate_html(data):
                 <div class='yansiyan-row'><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0,00')} TL</span></div>
             </div></div>
             """
-    inner_html += f"<div class='grand-footer'><span>Hastaya Yansıyan</span><span class='price'>{data.get('genel_bakiye', '0,00')} TL</span></div>"
+    inner_html += f"<div class='grand-footer'><span>Toplam Ödenecek Tutar</span><span class='price'>{data.get('genel_bakiye', '0,00')} TL</span></div>"
 
     return f"""
     <!DOCTYPE html>
