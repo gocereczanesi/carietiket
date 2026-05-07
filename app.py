@@ -48,7 +48,7 @@ def hesapla_genel_bakiye(data):
     data['genel_bakiye'] = f"{tam_kisim_fmt},{ondalik_kisim}"
     return data
 
-# --- HİBRİT BOTANİK METİN PARÇALAYICI (DENEME 3 - GÜNCEL) ---
+# --- HİBRİT BOTANİK METİN PARÇALAYICI (v1.1 GÜNCEL - İlaç İsmi Ayıklama Düzeltildi) ---
 def parse_botanik_text(text):
     data = {"hasta_adi_genel": "", "receteler": [], "genel_bakiye": "0,00"}
     
@@ -63,17 +63,14 @@ def parse_botanik_text(text):
                 "recete_payi": "0,00", "toplam_fark": "0,00", "yansiyan": "0,00", "kod": "Reçete Bilgisi"
             }
             
-            # Hasta Adı
             isim_m = re.search(r'Sayın\s*:\s*(.*?)(?=Tc Kimlik)', block)
             if isim_m:
                 recete['hasta_adi_ozel'] = isim_m.group(1).strip()
                 if not data["hasta_adi_genel"]: data["hasta_adi_genel"] = recete['hasta_adi_ozel']
             
-            # Tarih (İşlem Tarihi)
             tarih_m = re.search(r'İşlem Tarihi:.*?\s+(\d{2}-\d{2}-\d{4})', block)
             recete['tarih'] = tarih_m.group(1).replace('-', '.') if tarih_m else ""
             
-            # Genel Hesaplar
             fark_m = re.search(r'Fiyat Farkı\s+([\d,.]+)', block)
             mua_m = re.search(r'Muayene Katkı Payı\s+([\d,.]+)', block)
             tahsilat_m = re.search(r'Ödenecek Toplam\s+([\d,.]+)', block)
@@ -82,25 +79,22 @@ def parse_botanik_text(text):
             if mua_m: recete['muayene_ucreti'] = mua_m.group(1)
             if tahsilat_m: recete['yansiyan'] = tahsilat_m.group(1)
 
-            # İlaçları Ayıkla
-            # İlaçlar "Doktor :" ile "Rx Kat.Pay" arasındadır
             drug_section = re.search(r'Doktor\s*:.*?\n(.*?)(?=Rx Kat\.Pay)', block, re.DOTALL)
             if drug_section:
                 drug_text = drug_section.group(1)
-                # İlaç satırlarını yakala: İsim + Doz ... Alt satırda Adet + Fark
                 drug_matches = re.finditer(r'(.*?)\s+Doz.*?\n.*?\)\s+(\d+)\s+([\d,.]+)', drug_text)
                 for m in drug_matches:
                     recete['ilaclar'].append({
                         "ad": m.group(1).strip(),
                         "adet": m.group(2).strip(),
-                        "fiyat": "0,00", # Bu formatta birim fiyat yok
+                        "fiyat": "0,00", 
                         "fiyat_farki": m.group(3).strip()
                     })
             
             data['receteler'].append(recete)
         return data
 
-    # FORMAT A (DETAYLI BOTANİK)
+    # FORMAT A ve B (DETAYLI BOTANİK ve ÖZET)
     pattern = r'(?=\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2})'
     blocks = re.split(pattern, text.strip())
     blocks = [b.strip() for b in blocks if b.strip()]
@@ -130,11 +124,28 @@ def parse_botanik_text(text):
                 ilac_nums = re.findall(r'\d+,\d{2}|\b\d+\b', ilac_line)
                 try:
                     if is_perakende and len(ilac_nums) >= 3:
-                        fiyat, adet = ilac_nums[-3], ilac_nums[-2]
-                        recete['ilaclar'].append({"ad": ilac_line[:ilac_line.rfind(fiyat)].strip(), "adet": adet, "fiyat": fiyat, "fiyat_farki": "0,00"})
+                        fiyat = ilac_nums[-3]
+                        adet = ilac_nums[-2]
+                        toplam = ilac_nums[-1]
+                        
+                        # Akıllı İsim Ayıklayıcı
+                        pattern_str = r'(.*?)\s+' + re.escape(fiyat) + r'\s+' + re.escape(adet) + r'\s+' + re.escape(toplam) + r'\s*$'
+                        match = re.search(pattern_str, ilac_line)
+                        isim = match.group(1).strip() if match else ilac_line.rsplit(fiyat, 1)[0].strip()
+                        
+                        recete['ilaclar'].append({"ad": isim, "adet": adet, "fiyat": fiyat, "fiyat_farki": "0,00"})
                     elif not is_perakende and len(ilac_nums) >= 4:
-                        fiyat, adet, fark = ilac_nums[-4], ilac_nums[-3], ilac_nums[-1]
-                        recete['ilaclar'].append({"ad": ilac_line[:ilac_line.rfind(fiyat)].strip(), "adet": adet, "fiyat": fiyat, "fiyat_farki": fark})
+                        fiyat = ilac_nums[-4]
+                        adet = ilac_nums[-3]
+                        toplam = ilac_nums[-2]
+                        fark = ilac_nums[-1]
+                        
+                        # Akıllı İsim Ayıklayıcı
+                        pattern_str = r'(.*?)\s+' + re.escape(fiyat) + r'\s+' + re.escape(adet) + r'.*?' + re.escape(fark) + r'\s*$'
+                        match = re.search(pattern_str, ilac_line)
+                        isim = match.group(1).strip() if match else ilac_line.rsplit(fiyat, 1)[0].strip()
+                            
+                        recete['ilaclar'].append({"ad": isim, "adet": adet, "fiyat": fiyat, "fiyat_farki": fark})
                 except: pass
             
             if hesaplar_idx + 1 < len(lines):
@@ -155,7 +166,7 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON (KİLİTLİ TASARIM) ---
+# --- HTML OLUŞTURUCU FONKSİYON (v1.1 GÜNCEL) ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     inner_html = f"""
@@ -184,7 +195,14 @@ def generate_html(data):
                 <div class='yansiyan-row'><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0,00')} TL</span></div>
             </div></div>
             """
-    inner_html += f"<div class='grand-footer'><span>Toplam Ödenecek Tutar</span><span class='price'>{data.get('genel_bakiye', '0,00')} TL</span></div>"
+            
+    # v1.1 DÜZENLEME: Toplam Ödenecek Tutar (Alt alta)
+    inner_html += f"""
+    <div class='grand-footer'>
+        <span style='line-height: 1.2;'>Toplam<br>Ödenecek<br>Tutar</span>
+        <span class='price'>{data.get('genel_bakiye', '0,00')} TL</span>
+    </div>
+    """
 
     return f"""
     <!DOCTYPE html>
@@ -272,7 +290,35 @@ with col2:
                 try:
                     img = Image.open(uploaded_file)
                     model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"temperature": 0.0})
-                    prompt = "Botanik eczane dökümünü incele ve JSON döndür. genel_bakiye'yi 0.00 bırak."
+                    prompt = """
+                    Botanik eczane dökümünü incele ve JSON döndür. 
+                    ÖNEMLİ KURALLAR:
+                    1. Her reçetenin başında yazan HASTA ADINI mutlaka ayrı yakala.
+                    2. Her ilaç için ADET ve FİYAT bilgilerini çek. "ad" kısmına SADECE ilacın ismini yaz (fiyat ve adet rakamlarını isme KESİNLİKLE dahil etme).
+                    3. Reçeteler için HESAPLAR satırındaki tutarları ayıkla.
+                    4. genel_bakiye'yi 0.00 bırak, sistem kendi hesaplayacak.
+                    
+                    JSON ŞEMASI:
+                    {
+                      "hasta_adi_genel": "Ana Hasta Adı",
+                      "receteler": [
+                        {
+                          "tarih": "GG.AA.YYYY",
+                          "hasta_adi_ozel": "Bu Reçetedeki İsim",
+                          "kod": "Reçete Kodu",
+                          "ilaclar": [
+                            {"ad": "SADECE İlaç Adı", "adet": "1", "fiyat": "0.00", "fiyat_farki": "0.00"}
+                          ],
+                          "katilim_payi": "0.00", 
+                          "muayene_ucreti": "0.00", 
+                          "recete_payi": "0.00", 
+                          "toplam_fark": "0.00", 
+                          "yansiyan": "0.00"
+                        }
+                      ],
+                      "genel_bakiye": "0.00"
+                    }
+                    """
                     response = model.generate_content([prompt, img])
                     data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group(0))
                     data = hesapla_genel_bakiye(data)
