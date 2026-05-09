@@ -164,7 +164,7 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON (1:1 KARE TASARIM) ---
+# --- HTML OLUŞTURUCU FONKSİYON (1:0.75 PORTRE TASARIM) ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     
@@ -240,7 +240,7 @@ def generate_html(data):
             /* --- SARI KONTROL PANELİ --- */
             .sticky-bar {{ 
                 position: sticky; top: 0; z-index: 1000; background-color: #fff9c4; border: 1px solid #f2d06b; border-radius: 12px; 
-                width: 100%; max-width: 800px; 
+                width: 100%; max-width: 600px; /* EN (Width) ile uyumlu */
                 display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; margin-bottom: 20px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             }}
             .sticky-bar h2 {{ margin: 0; font-size: 16px; color: #5c4d0c; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
@@ -248,14 +248,15 @@ def generate_html(data):
             .btn {{ border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; color: white; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s; }}
             .btn-print {{ background-color: #2980b9; }} .btn-copy {{ background-color: #8e44ad; }} .btn-jpg {{ background-color: #27ae60; }}
 
-            /* --- 1:1 KARE DÜZENİ --- */
+            /* --- 1:0.75 BOY:EN ORANI --- */
             .capture-wrapper {{ 
                 background-color: #ffffff; padding: 50px; border-radius: 20px; 
-                width: fit-content; margin-bottom: 30px; display: flex; justify-content: center; align-items: center;
+                max-width: 700px; /* 600px kart + 100px padding */
+                margin-bottom: 30px; display: flex; justify-content: center; align-items: center;
             }}
             .container {{ 
-                width: 800px; /* Genişliği 800'e çıkardık, ferahladı */
-                min-height: 800px; /* 1:1 KARE ORANI */
+                width: 600px; /* EN: 0.75 */
+                min-height: 800px; /* BOY: 1 */
                 background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; outline: none; 
                 display: flex; flex-direction: column; /* İçeriği esnetmek için */
             }}
@@ -265,23 +266,23 @@ def generate_html(data):
                 background-color: white;
             }}
 
-            .header {{ background: var(--primary); color: white; padding: 30px 40px; text-align: left; }}
-            .patient-name {{ font-size: 26px; font-weight: bold; margin-top: 8px; }}
-            .recete-block {{ padding: 25px 40px; border-bottom: 8px solid var(--bg); }}
+            .header {{ background: var(--primary); color: white; padding: 25px 35px; text-align: left; }}
+            .patient-name {{ font-size: 24px; font-weight: bold; margin-top: 8px; }}
+            .recete-block {{ padding: 20px 35px; border-bottom: 8px solid var(--bg); }}
             .recete-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee; }}
-            .date-tag {{ font-weight: bold; color: var(--primary); font-size: 16px; }}
-            .kod-tag {{ font-size: 12px; color: #999; border: 1px solid #eee; padding: 3px 8px; border-radius: 4px; }}
+            .date-tag {{ font-weight: bold; color: var(--primary); font-size: 15px; }}
+            .kod-tag {{ font-size: 11px; color: #999; border: 1px solid #eee; padding: 3px 8px; border-radius: 4px; }}
             .ilac-row {{ padding: 12px 0; border-bottom: 1px dashed #f0f0f0; }}
-            .ilac-main {{ display: flex; justify-content: space-between; font-size: 15px; font-weight: 500; }}
+            .ilac-main {{ display: flex; justify-content: space-between; font-size: 14px; font-weight: 500; }}
             .ilac-sub {{ display: flex; justify-content: space-between; font-size: 12px; color: #777; margin-top: 4px; }}
             .fark-info {{ color: var(--fark); font-weight: bold; }}
             .details-box {{ background: #f9fdfc; padding: 15px 25px; margin-top: 15px; border-radius: 12px; border: 1px solid #edf5f4; }}
             .detail-line {{ display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 6px; }}
-            .detail-fark {{ display: flex; justify-content: space-between; font-size: 14px; color: #444; font-weight: bold; padding-top: 6px; border-top: 1px dashed #eee; }}
-            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 17px; font-weight: bold; color: #27ae60; margin-top: 10px; padding-top: 10px; border-top: 1px solid #d1e8e5; }}
+            .detail-fark {{ display: flex; justify-content: space-between; font-size: 13px; color: #444; font-weight: bold; padding-top: 6px; border-top: 1px dashed #eee; }}
+            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; color: #27ae60; margin-top: 10px; padding-top: 10px; border-top: 1px solid #d1e8e5; }}
             
-            .grand-footer {{ background: var(--primary); color: white; padding: 30px 40px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }}
-            .grand-footer .price {{ font-size: 36px; font-weight: bold; }}
+            .grand-footer {{ background: var(--primary); color: white; padding: 25px 35px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }}
+            .grand-footer .price {{ font-size: 32px; font-weight: bold; }}
             
             [contenteditable="true"] {{ cursor: text; }}
             [contenteditable="true"]:focus {{ outline: none; }}
@@ -290,7 +291,7 @@ def generate_html(data):
     </head>
     <body>
         <div class="sticky-bar no-print">
-            <h2>🧾 Hastaya Verilecek Döküm (1:1 Özel)</h2>
+            <h2>🧾 Hastaya Verilecek Döküm (1:0.75 Altın Oran)</h2>
             <div class="action-buttons">
                 <button class="btn btn-print" onclick="window.print()">🖨️ Yazdır</button>
                 <button class="btn btn-copy" onclick="copyImage()">📋 Kopyala</button>
@@ -341,7 +342,6 @@ with col2:
                 try:
                     data = parse_botanik_text(raw_text)
                     data = hesapla_genel_bakiye(data)
-                    # Yüksekliği artırdık ki 1:1 kare rahatça ekrana sığsın
                     components.html(generate_html(data), height=1100, scrolling=True)
                 except Exception as e: st.error(f"Hata: {str(e)}")
         elif uploaded_file:
