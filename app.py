@@ -24,7 +24,7 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- MATEMATİKSEL TOPLAMA FONKSİYONU (KİLİTLİ) ---
+# --- MATEMATİKSEL TOPLAMA FONKSİYONU ---
 def hesapla_genel_bakiye(data):
     toplam_genel = 0.0
     for r in data.get('receteler', []):
@@ -52,48 +52,70 @@ def hesapla_genel_bakiye(data):
 def parse_botanik_text(text):
     data = {"hasta_adi_genel": "", "receteler": [], "genel_bakiye": "0,00"}
     
+    # FORMAT C (YENİ HASTA BİLGİLENDİRME FİŞİ)
     if "Sayın :" in text and "Tc Kimlik No:" in text:
         blocks = re.split(r'(?=Sayın\s*:)', text.strip())
         blocks = [b.strip() for b in blocks if b.strip()]
+        
         for block in blocks:
-            recete = {"ilaclar": [], "katilim_payi": "0,00", "muayene_ucreti": "0,00", "recete_payi": "0,00", "toplam_fark": "0,00", "yansiyan": "0,00", "kod": "Reçete Bilgisi"}
+            recete = {
+                "ilaclar": [], "katilim_payi": "0,00", "muayene_ucreti": "0,00", 
+                "recete_payi": "0,00", "toplam_fark": "0,00", "yansiyan": "0,00", "kod": "Reçete Bilgisi"
+            }
+            
             isim_m = re.search(r'Sayın\s*:\s*(.*?)(?=Tc Kimlik)', block)
             if isim_m:
                 recete['hasta_adi_ozel'] = isim_m.group(1).strip()
                 if not data["hasta_adi_genel"]: data["hasta_adi_genel"] = recete['hasta_adi_ozel']
+            
             tarih_m = re.search(r'İşlem Tarihi:.*?\s+(\d{2}-\d{2}-\d{4})', block)
             recete['tarih'] = tarih_m.group(1).replace('-', '.') if tarih_m else ""
+            
             fark_m = re.search(r'Fiyat Farkı\s+([\d,.]+)', block)
             mua_m = re.search(r'Muayene Katkı Payı\s+([\d,.]+)', block)
             tahsilat_m = re.search(r'Ödenecek Toplam\s+([\d,.]+)', block)
+            
             if fark_m: recete['toplam_fark'] = fark_m.group(1)
             if mua_m: recete['muayene_ucreti'] = mua_m.group(1)
             if tahsilat_m: recete['yansiyan'] = tahsilat_m.group(1)
+
             drug_section = re.search(r'Doktor\s*:.*?\n(.*?)(?=Rx Kat\.Pay)', block, re.DOTALL)
             if drug_section:
                 drug_text = drug_section.group(1)
                 drug_matches = re.finditer(r'(.*?)\s+Doz.*?\n.*?\)\s+(\d+)\s+([\d,.]+)', drug_text)
                 for m in drug_matches:
-                    recete['ilaclar'].append({"ad": m.group(1).strip(), "adet": m.group(2).strip(), "fiyat": "0,00", "fiyat_farki": m.group(3).strip()})
+                    recete['ilaclar'].append({
+                        "ad": m.group(1).strip(),
+                        "adet": m.group(2).strip(),
+                        "fiyat": "0,00", 
+                        "fiyat_farki": m.group(3).strip()
+                    })
+            
             data['receteler'].append(recete)
         return data
 
+    # FORMAT A ve B (DETAYLI BOTANİK ve ÖZET)
     pattern = r'(?=\d{2}\.\d{2}\.\d{4}\s\d{2}:\d{2})'
     blocks = re.split(pattern, text.strip())
     blocks = [b.strip() for b in blocks if b.strip()]
+    
     for block in blocks:
         lines = [l.strip() for l in block.split('\n') if l.strip()]
         if not lines: continue
         header = lines[0]
         recete = {"ilaclar": [], "katilim_payi": "0,00", "muayene_ucreti": "0,00", "recete_payi": "0,00", "toplam_fark": "0,00", "yansiyan": "0,00"}
+        
         tarih_match = re.search(r'\d{2}\.\d{2}\.\d{4}', header)
         recete['tarih'] = tarih_match.group(0) if tarih_match else ""
+        
         isim_match = re.search(r'\d{2}:\d{2}\s+(.*?)\s+(Reçetesi|Perakendesi)', header)
         if isim_match:
             recete['hasta_adi_ozel'] = isim_match.group(1).strip()
             if not data["hasta_adi_genel"]: data["hasta_adi_genel"] = recete['hasta_adi_ozel']
+        
         is_perakende = "Perakendesi" in header
         recete['kod'] = "Perakende Satış" if is_perakende else (re.search(r'\(\d+\)\s+([A-Z0-9]+)', header).group(1) if re.search(r'\(\d+\)\s+([A-Z0-9]+)', header) else "")
+        
         hesaplar_idx = next((i for i, line in enumerate(lines) if line.startswith("HESAPLAR")), -1)
         if hesaplar_idx != -1:
             for i in range(2, hesaplar_idx):
@@ -102,18 +124,28 @@ def parse_botanik_text(text):
                 ilac_nums = re.findall(r'\d+,\d{2}|\b\d+\b', ilac_line)
                 try:
                     if is_perakende and len(ilac_nums) >= 3:
-                        fiyat, adet, toplam = ilac_nums[-3], ilac_nums[-2], ilac_nums[-1]
+                        fiyat = ilac_nums[-3]
+                        adet = ilac_nums[-2]
+                        toplam = ilac_nums[-1]
+                        
                         pattern_str = r'(.*?)\s+' + re.escape(fiyat) + r'\s+' + re.escape(adet) + r'\s+' + re.escape(toplam) + r'\s*$'
                         match = re.search(pattern_str, ilac_line)
                         isim = match.group(1).strip() if match else ilac_line.rsplit(fiyat, 1)[0].strip()
+                        
                         recete['ilaclar'].append({"ad": isim, "adet": adet, "fiyat": fiyat, "fiyat_farki": "0,00"})
                     elif not is_perakende and len(ilac_nums) >= 4:
-                        fiyat, adet, toplam, fark = ilac_nums[-4], ilac_nums[-3], ilac_nums[-2], ilac_nums[-1]
+                        fiyat = ilac_nums[-4]
+                        adet = ilac_nums[-3]
+                        toplam = ilac_nums[-2]
+                        fark = ilac_nums[-1]
+                        
                         pattern_str = r'(.*?)\s+' + re.escape(fiyat) + r'\s+' + re.escape(adet) + r'.*?' + re.escape(fark) + r'\s*$'
                         match = re.search(pattern_str, ilac_line)
                         isim = match.group(1).strip() if match else ilac_line.rsplit(fiyat, 1)[0].strip()
+                            
                         recete['ilaclar'].append({"ad": isim, "adet": adet, "fiyat": fiyat, "fiyat_farki": fark})
                 except: pass
+            
             if hesaplar_idx + 1 < len(lines):
                 hesap_satiri = lines[hesaplar_idx + 1]
                 if is_perakende:
@@ -132,25 +164,49 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON (v1.2 GÜNCEL) ---
+# --- HTML OLUŞTURUCU FONKSİYON (1:1 KARE TASARIM) ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
+    
+    # Üst Kısım ve İlaçlar (Esnek Alan)
     inner_html = f"""
-    <div class="header"><h1>REÇETENİZ HAZIR</h1><div class="patient-name">{data.get('hasta_adi_genel', 'Hasta Bilgisi')}</div></div>
+    <div class="content-area">
+        <div class="header">
+            <h1>REÇETENİZ HAZIR</h1>
+            <div class="patient-name">{data.get('hasta_adi_genel', 'Hasta Bilgisi')}</div>
+        </div>
     """
     for r in data.get('receteler', []):
         inner_html += f"""
         <div class="recete-block">
             <div class="recete-patient">Hasta: {r.get('hasta_adi_ozel', '')}</div>
-            <div class="recete-header"><span class="date-tag">{r.get('tarih', '')}</span><span class="kod-tag">{r.get('kod', '')}</span></div>
+            <div class="recete-header">
+                <span class="date-tag">{r.get('tarih', '')}</span>
+                <span class="kod-tag">{r.get('kod', '')}</span>
+            </div>
         """
         for ilac in r.get('ilaclar', []):
             fark = str(ilac.get('fiyat_farki', '0,00'))
             fark_html = f"<span class='fark-info'>+ {fark} TL Fark</span>" if fark not in ["0.00", "0,00", "0", ""] else ""
-            inner_html += f"<div class='ilac-row'><div class='ilac-main'><span>{ilac.get('ad', '')}</span><span>{ilac.get('fiyat', '0,00')} TL</span></div><div class='ilac-sub'><span>Adet: {ilac.get('adet', '1')}</span>{fark_html}</div></div>"
+            inner_html += f"""
+            <div class='ilac-row'>
+                <div class='ilac-main'>
+                    <span>{ilac.get('ad', '')}</span>
+                    <span>{ilac.get('fiyat', '0,00')} TL</span>
+                </div>
+                <div class='ilac-sub'>
+                    <span>Adet: {ilac.get('adet', '1')}</span>
+                    {fark_html}
+                </div>
+            </div>
+            """
         
         if "Perakende" in r.get('kod', ''):
-            inner_html += f"<div class='details-box'><div class='yansiyan-row'><span>Perakende Tutar</span><span>{r.get('yansiyan', '0,00')} TL</span></div></div></div>"
+            inner_html += f"""
+            <div class='details-box'>
+                <div class='yansiyan-row'><span>Perakende Tutar</span><span>{r.get('yansiyan', '0,00')} TL</span></div>
+            </div></div>
+            """
         else:
             inner_html += f"""
             <div class='details-box'>
@@ -161,7 +217,15 @@ def generate_html(data):
                 <div class='yansiyan-row'><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0,00')} TL</span></div>
             </div></div>
             """
-    inner_html += f"<div class='grand-footer'><span style='line-height: 1.2;'>Toplam<br>Ödenecek<br>Tutar</span><span class='price'>{data.get('genel_bakiye', '0,00')} TL</span></div>"
+    inner_html += "</div>" # content-area sonu
+
+    # Alt Kısım (En alta sabitlenir)
+    inner_html += f"""
+    <div class='grand-footer'>
+        <span style='line-height: 1.2;'>Toplam<br>Ödenecek<br>Tutar</span>
+        <span class='price'>{data.get('genel_bakiye', '0,00')} TL</span>
+    </div>
+    """
 
     return f"""
     <!DOCTYPE html>
@@ -173,10 +237,10 @@ def generate_html(data):
             :root {{ --primary: #00695c; --fark: #e67e22; --bg: #f4f7f6; --text: #333; }}
             body {{ font-family: 'Segoe UI', sans-serif; background: transparent; display: flex; flex-direction: column; align-items: center; padding: 0; color: var(--text); margin: 0; }}
             
-            /* --- SARI KONTROL PANELİ (Genişletildi) --- */
+            /* --- SARI KONTROL PANELİ --- */
             .sticky-bar {{ 
                 position: sticky; top: 0; z-index: 1000; background-color: #fff9c4; border: 1px solid #f2d06b; border-radius: 12px; 
-                width: 100%; max-width: 750px; /* MOD: Yatay Genişleme */
+                width: 100%; max-width: 800px; 
                 display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; margin-bottom: 20px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             }}
             .sticky-bar h2 {{ margin: 0; font-size: 16px; color: #5c4d0c; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
@@ -184,16 +248,21 @@ def generate_html(data):
             .btn {{ border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; color: white; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: 0.2s; }}
             .btn-print {{ background-color: #2980b9; }} .btn-copy {{ background-color: #8e44ad; }} .btn-jpg {{ background-color: #27ae60; }}
 
-            /* v1.2: FERAH YATAY TASARIM (Capture Area) */
+            /* --- 1:1 KARE DÜZENİ --- */
             .capture-wrapper {{ 
                 background-color: #ffffff; padding: 50px; border-radius: 20px; 
-                max-width: 850px; /* MOD: 750px kart + 100px padding */
-                margin-bottom: 30px; display: flex; justify-content: center; align-items: center;
+                width: fit-content; margin-bottom: 30px; display: flex; justify-content: center; align-items: center;
             }}
             .container {{ 
-                width: 100%; 
-                max-width: 750px; /* MOD: Yatay Genişleme (500px'den 750px'e) */
+                width: 800px; /* Genişliği 800'e çıkardık, ferahladı */
+                min-height: 800px; /* 1:1 KARE ORANI */
                 background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; outline: none; 
+                display: flex; flex-direction: column; /* İçeriği esnetmek için */
+            }}
+
+            .content-area {{
+                flex-grow: 1; /* Ortadaki beyaz alanı esnetir, yeşil alt barı en aşağıya iter */
+                background-color: white;
             }}
 
             .header {{ background: var(--primary); color: white; padding: 30px 40px; text-align: left; }}
@@ -210,6 +279,7 @@ def generate_html(data):
             .detail-line {{ display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 6px; }}
             .detail-fark {{ display: flex; justify-content: space-between; font-size: 14px; color: #444; font-weight: bold; padding-top: 6px; border-top: 1px dashed #eee; }}
             .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 17px; font-weight: bold; color: #27ae60; margin-top: 10px; padding-top: 10px; border-top: 1px solid #d1e8e5; }}
+            
             .grand-footer {{ background: var(--primary); color: white; padding: 30px 40px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }}
             .grand-footer .price {{ font-size: 36px; font-weight: bold; }}
             
@@ -220,7 +290,7 @@ def generate_html(data):
     </head>
     <body>
         <div class="sticky-bar no-print">
-            <h2>🧾 Hastaya Verilecek Döküm (v1.2)</h2>
+            <h2>🧾 Hastaya Verilecek Döküm (1:1 Özel)</h2>
             <div class="action-buttons">
                 <button class="btn btn-print" onclick="window.print()">🖨️ Yazdır</button>
                 <button class="btn btn-copy" onclick="copyImage()">📋 Kopyala</button>
@@ -271,6 +341,7 @@ with col2:
                 try:
                     data = parse_botanik_text(raw_text)
                     data = hesapla_genel_bakiye(data)
+                    # Yüksekliği artırdık ki 1:1 kare rahatça ekrana sığsın
                     components.html(generate_html(data), height=1100, scrolling=True)
                 except Exception as e: st.error(f"Hata: {str(e)}")
         elif uploaded_file:
@@ -278,7 +349,35 @@ with col2:
                 try:
                     img = Image.open(uploaded_file)
                     model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"temperature": 0.0})
-                    prompt = "Botanik eczane dökümünü incele ve JSON döndür. genel_bakiye'yi 0.00 bırak. İlaç isimlerini temiz al."
+                    prompt = """
+                    Botanik eczane dökümünü incele ve JSON döndür. 
+                    ÖNEMLİ KURALLAR:
+                    1. Her reçetenin başında yazan HASTA ADINI mutlaka ayrı yakala.
+                    2. Her ilaç için ADET ve FİYAT bilgilerini çek. "ad" kısmına SADECE ilacın ismini yaz (fiyat ve adet rakamlarını isme KESİNLİKLE dahil etme).
+                    3. Reçeteler için HESAPLAR satırındaki tutarları ayıkla.
+                    4. genel_bakiye'yi 0.00 bırak, sistem kendi hesaplayacak.
+                    
+                    JSON ŞEMASI:
+                    {
+                      "hasta_adi_genel": "Ana Hasta Adı",
+                      "receteler": [
+                        {
+                          "tarih": "GG.AA.YYYY",
+                          "hasta_adi_ozel": "Bu Reçetedeki İsim",
+                          "kod": "Reçete Kodu",
+                          "ilaclar": [
+                            {"ad": "SADECE İlaç Adı", "adet": "1", "fiyat": "0.00", "fiyat_farki": "0.00"}
+                          ],
+                          "katilim_payi": "0.00", 
+                          "muayene_ucreti": "0.00", 
+                          "recete_payi": "0.00", 
+                          "toplam_fark": "0.00", 
+                          "yansiyan": "0.00"
+                        }
+                      ],
+                      "genel_bakiye": "0.00"
+                    }
+                    """
                     response = model.generate_content([prompt, img])
                     data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group(0))
                     data = hesapla_genel_bakiye(data)
