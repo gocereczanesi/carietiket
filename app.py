@@ -23,7 +23,7 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- MATEMATİKSEL TOPLAMA FONKSİYONU (GÜNCELLENDİ: NOKTA/VİRGÜL HATASI ÇÖZÜLDÜ) ---
+# --- MATEMATİKSEL TOPLAMA FONKSİYONU ---
 def hesapla_genel_bakiye(data):
     toplam_borc = 0.0
     toplam_odeme = 0.0
@@ -69,7 +69,7 @@ def hesapla_genel_bakiye(data):
     data['genel_bakiye'] = f"{tam_kisim_fmt},{ondalik_kisim}"
     return data
 
-# --- HİBRİT BOTANİK METİN PARÇALAYICI (AYNI KALDI) ---
+# --- HİBRİT BOTANİK METİN PARÇALAYICI ---
 def parse_botanik_text(text):
     data = {"hasta_adi_genel": "", "receteler": [], "tahsilatlar": [], "genel_bakiye": "0,00"}
     
@@ -185,7 +185,7 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON (GÜNCELLENDİ: TAHSİLATLAR EKLENDİ) ---
+# --- HTML OLUŞTURUCU FONKSİYON ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     
@@ -381,17 +381,23 @@ with col2:
                 except Exception as e: st.error(f"Hata: {str(e)}")
                 
         elif uploaded_file:
-            with st.spinner("🤖 Yapay Zeka HTML Dosyasını Okuyor..."):
+            with st.spinner("🤖 Yapay Zeka Hızlandırılmış Modda Dosyayı Okuyor..."):
                 try:
                     # HTML dosyasını metin olarak oku
-                    html_content = uploaded_file.getvalue().decode("utf-8")
+                    raw_html = uploaded_file.getvalue().decode("utf-8")
                     
-                    # Gemini modeli ayarları (Görsel okuma yerine artık doğrudan metin tabanlı çalışıyor)
+                    # --- YAPAY ZEKAYI HIZLANDIRAN FİLTRE: HTML ETİKETLERİNİ TEMİZLE ---
+                    clean_text = re.sub(r'<style.*?</style>', '', raw_html, flags=re.DOTALL) # CSS kodlarını sil
+                    clean_text = re.sub(r'<script.*?</script>', '', clean_text, flags=re.DOTALL) # JS kodlarını sil
+                    clean_text = re.sub(r'<[^>]+>', ' ', clean_text) # Kalan tüm < > etiketlerini sil
+                    clean_text = re.sub(r'\s+', ' ', clean_text).strip() # Fazladan boşlukları teke düşür
+                    
+                    # Gemini modeli ayarları
                     model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"temperature": 0.0})
                     prompt = """
-                    Ekteki HTML formatındaki eczane/hasta dökümünü detaylıca incele ve istenen JSON formatında veriyi döndür. 
+                    Ekteki temizlenmiş eczane/hasta dökümünü detaylıca incele ve istenen JSON formatında veriyi döndür. 
                     ÖNEMLİ KURALLAR:
-                    1. HTML içindeki ana hasta adını, reçete girişlerini, ilaç adlarını, fiyat ve adetlerini ayıkla.
+                    1. İçindeki ana hasta adını, reçete girişlerini, ilaç adlarını, fiyat ve adetlerini ayıkla.
                     2. İlaç "ad" alanına SADECE ilacın ismini yaz (fiyat ve adet rakamlarını KESİNLİKLE isme dahil etme).
                     3. Tabloda hastanın yaptığı "Nakit Tahsilat", "Kredi Kartı", "POS" gibi ÖDEMELER varsa bunları ayıklayıp "tahsilatlar" listesine ekle.
                     4. genel_bakiye'yi 0.00 bırak, sistem kendi matematik formülüyle hesaplayacak.
@@ -424,7 +430,8 @@ with col2:
                       "genel_bakiye": "0.00"
                     }
                     """
-                    response = model.generate_content([prompt, html_content])
+                    # Saf metni modele gönderiyoruz (Eskiden ham html'yi gönderdiğimiz için yavaştı)
+                    response = model.generate_content([prompt, clean_text])
                     
                     # JSON'u yanıttan ayıkla
                     json_str = re.search(r'\{.*\}', response.text, re.DOTALL).group(0)
