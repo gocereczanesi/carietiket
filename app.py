@@ -1,9 +1,15 @@
+Anladım abi, çok mantıklı. Metin yapıştırma kısmına (`parse_botanik_text`) hiç dokunmuyoruz, o eskisi gibi çalışmaya devam edecek.
+
+İkinci sekmeyi **"Görsel Yükle"** yerine **"🌐 HTML Dosyası Yükle"** olarak değiştirdim. Artık sisteme o detaylı hasta tablosunu içeren `.html` dosyasını yüklediğinde, yapay zeka (Gemini) HTML kodunu okuyup içindeki hem reçeteleri hem de **tahsilatları (ödemeleri)** ayrıştıracak ve eksiksiz bir Cari Kart dökümü oluşturacak.
+
+Ayrıca önceki mesajda bahsettiğim "Ödeme Düşme" (tahsilat) mantığını da döküme ve genel bakiye matematiğine entegre ettim. İşte **Carikart v1.3**'ün tam ve güncel kodu:
+
+```python
 import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
 import json
 import re
-from PIL import Image
 
 # Sayfa Ayarları
 st.set_page_config(page_title="Eczane Cari Kart Dökümü", page_icon="💊", layout="wide")
@@ -24,33 +30,53 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- MATEMATİKSEL TOPLAMA FONKSİYONU ---
+# --- MATEMATİKSEL TOPLAMA FONKSİYONU (GÜNCELLENDİ: TAHSİLATLAR EKLENDİ) ---
 def hesapla_genel_bakiye(data):
-    toplam_genel = 0.0
+    toplam_borc = 0.0
+    toplam_odeme = 0.0
+    
+    # Reçetelerden gelen borçları topla
     for r in data.get('receteler', []):
         yans_str = str(r.get('yansiyan', '0,00'))
         try:
             val = float(yans_str.replace('.', '').replace(',', '.'))
-            toplam_genel += val
+            toplam_borc += val
         except:
             pass
             
-    parts = f"{toplam_genel:.2f}".split('.')
+    # Tahsilatları (ödemeleri) topla
+    for t in data.get('tahsilatlar', []):
+        tutar_str = str(t.get('tutar', '0,00'))
+        try:
+            val = float(tutar_str.replace('.', '').replace(',', '.'))
+            toplam_odeme += val
+        except:
+            pass
+
+    # Net bakiyeyi hesapla (Borç - Ödenen)
+    net_bakiye = toplam_borc - toplam_odeme
+    
+    parts = f"{net_bakiye:.2f}".split('.')
     tam_kisim = parts[0]
     ondalik_kisim = parts[1]
     
     tam_kisim_fmt = ""
+    is_negative = tam_kisim.startswith('-')
+    if is_negative: tam_kisim = tam_kisim[1:]
+        
     for i, digit in enumerate(reversed(tam_kisim)):
-        if i > 0 and i % 3 == 0 and tam_kisim[0] != '-':
+        if i > 0 and i % 3 == 0:
             tam_kisim_fmt = '.' + tam_kisim_fmt
         tam_kisim_fmt = digit + tam_kisim_fmt
+        
+    if is_negative: tam_kisim_fmt = '-' + tam_kisim_fmt
         
     data['genel_bakiye'] = f"{tam_kisim_fmt},{ondalik_kisim}"
     return data
 
-# --- HİBRİT BOTANİK METİN PARÇALAYICI ---
+# --- HİBRİT BOTANİK METİN PARÇALAYICI (AYNI KALDI) ---
 def parse_botanik_text(text):
-    data = {"hasta_adi_genel": "", "receteler": [], "genel_bakiye": "0,00"}
+    data = {"hasta_adi_genel": "", "receteler": [], "tahsilatlar": [], "genel_bakiye": "0,00"}
     
     # FORMAT C (YENİ HASTA BİLGİLENDİRME FİŞİ)
     if "Sayın :" in text and "Tc Kimlik No:" in text:
@@ -164,15 +190,15 @@ def parse_botanik_text(text):
         data['receteler'].append(recete)
     return data
 
-# --- HTML OLUŞTURUCU FONKSİYON (1:0.75 PORTRE TASARIM) ---
+# --- HTML OLUŞTURUCU FONKSİYON (GÜNCELLENDİ: TAHSİLATLAR EKLENDİ) ---
 def generate_html(data):
     hasta_adi_dosya = data.get('hasta_adi_genel', 'Eczane_Cari').replace(" ", "_")
     
-    # Üst Kısım ve İlaçlar (Esnek Alan)
+    # Üst Kısım ve İlaçlar
     inner_html = f"""
     <div class="content-area">
         <div class="header">
-            <h1>REÇETENİZ HAZIR</h1>
+            <h1>Cari Kart Dökümü</h1>
             <div class="patient-name">{data.get('hasta_adi_genel', 'Hasta Bilgisi')}</div>
         </div>
     """
@@ -214,15 +240,31 @@ def generate_html(data):
                 <div class='detail-line'><span>Muayene Ücreti</span><span>{r.get('muayene_ucreti', '0,00')} TL</span></div>
                 <div class='detail-line'><span>Reçete Payı</span><span>{r.get('recete_payi', '0,00')} TL</span></div>
                 <div class='detail-fark'><span>Fiyat Farkı</span><span>{r.get('toplam_fark', '0,00')} TL</span></div>
-                <div class='yansiyan-row'><span>Hastaya Yansıyan</span><span>{r.get('yansiyan', '0,00')} TL</span></div>
+                <div class='yansiyan-row'><span>Reçete Toplamı (Borç)</span><span>{r.get('yansiyan', '0,00')} TL</span></div>
             </div></div>
             """
+            
+    # Tahsilatlar (Ödemeler) Bloğu
+    if data.get('tahsilatlar'):
+        inner_html += "<div class='recete-block' style='border-top: 3px dashed #eee;'>"
+        inner_html += "<div class='patient-name' style='font-size: 18px; color: #27ae60; margin-bottom: 15px;'>💳 Yapılan Ödemeler (Tahsilat)</div>"
+        for t in data.get('tahsilatlar', []):
+            inner_html += f"""
+            <div class='ilac-row'>
+                <div class='ilac-main' style='color: #27ae60;'>
+                    <span>✔️ {t.get('tur', 'Tahsilat')} ({t.get('tarih', '')})</span>
+                    <span>- {t.get('tutar', '0,00')} TL</span>
+                </div>
+            </div>
+            """
+        inner_html += "</div>"
+
     inner_html += "</div>" # content-area sonu
 
     # Alt Kısım (En alta sabitlenir)
     inner_html += f"""
     <div class='grand-footer'>
-        <span style='line-height: 1.2;'>Toplam<br>Ödenecek<br>Tutar</span>
+        <span style='line-height: 1.2;'>Kalan<br>Net Bakiye</span>
         <span class='price'>{data.get('genel_bakiye', '0,00')} TL</span>
     </div>
     """
@@ -240,7 +282,7 @@ def generate_html(data):
             /* --- SARI KONTROL PANELİ --- */
             .sticky-bar {{ 
                 position: sticky; top: 0; z-index: 1000; background-color: #fff9c4; border: 1px solid #f2d06b; border-radius: 12px; 
-                width: 100%; max-width: 600px; /* EN (Width) ile uyumlu */
+                width: 100%; max-width: 600px; 
                 display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; margin-bottom: 20px; box-sizing: border-box; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
             }}
             .sticky-bar h2 {{ margin: 0; font-size: 16px; color: #5c4d0c; display: flex; align-items: center; gap: 8px; font-weight: 600; }}
@@ -251,21 +293,17 @@ def generate_html(data):
             /* --- 1:0.75 BOY:EN ORANI --- */
             .capture-wrapper {{ 
                 background-color: #ffffff; padding: 50px; border-radius: 20px; 
-                max-width: 700px; /* 600px kart + 100px padding */
+                max-width: 700px; 
                 margin-bottom: 30px; display: flex; justify-content: center; align-items: center;
             }}
             .container {{ 
-                width: 600px; /* EN: 0.75 */
-                min-height: 800px; /* BOY: 1 */
+                width: 600px; 
+                min-height: 800px; 
                 background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #ddd; outline: none; 
-                display: flex; flex-direction: column; /* İçeriği esnetmek için */
+                display: flex; flex-direction: column; 
             }}
 
-            .content-area {{
-                flex-grow: 1; /* Ortadaki beyaz alanı esnetir, yeşil alt barı en aşağıya iter */
-                background-color: white;
-            }}
-
+            .content-area {{ flex-grow: 1; background-color: white; }}
             .header {{ background: var(--primary); color: white; padding: 25px 35px; text-align: left; }}
             .patient-name {{ font-size: 24px; font-weight: bold; margin-top: 8px; }}
             .recete-block {{ padding: 20px 35px; border-bottom: 8px solid var(--bg); }}
@@ -279,7 +317,7 @@ def generate_html(data):
             .details-box {{ background: #f9fdfc; padding: 15px 25px; margin-top: 15px; border-radius: 12px; border: 1px solid #edf5f4; }}
             .detail-line {{ display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 6px; }}
             .detail-fark {{ display: flex; justify-content: space-between; font-size: 13px; color: #444; font-weight: bold; padding-top: 6px; border-top: 1px dashed #eee; }}
-            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; color: #27ae60; margin-top: 10px; padding-top: 10px; border-top: 1px solid #d1e8e5; }}
+            .yansiyan-row {{ display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; color: #c0392b; margin-top: 10px; padding-top: 10px; border-top: 1px solid #d1e8e5; }}
             
             .grand-footer {{ background: var(--primary); color: white; padding: 25px 35px; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }}
             .grand-footer .price {{ font-size: 32px; font-weight: bold; }}
@@ -322,16 +360,18 @@ def generate_html(data):
 col1, col2 = st.columns([1, 2.5], gap="large")
 with col1:
     st.subheader("📥 1. Veri Girişi")
-    tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "📸 Görsel Yükle"])
+    tab1, tab2 = st.tabs(["📄 Metin Yapıştır", "🌐 HTML Dosyası Yükle"])
+    
     with tab1:
         header_col, btn_col = st.columns([3, 1])
         with header_col: st.markdown("<p style='font-weight: bold;'>Botanik Verisini Yapıştırın:</p>", unsafe_allow_html=True)
         with btn_col: st.button("🗑️", on_click=clear_text, use_container_width=True)
         raw_text = st.text_area("Gizli Label", key="raw_text_input", label_visibility="collapsed", height=250)
+        
     with tab2:
-        st.info("💡 **CTRL+V** ile görsel yapıştırabilirsiniz!")
-        uploaded_file = st.file_uploader("Dosya yükleyin", type=["jpg", "jpeg", "png", "pdf"])
-        if uploaded_file: st.image(uploaded_file, use_column_width=True)
+        st.info("💡 **Sistemden aldığınız hasta ekstresi (.html)** dosyasını buraya yükleyebilirsiniz!")
+        uploaded_file = st.file_uploader("HTML Dosyası Yükleyin", type=["html"])
+        
     submit_button = st.button("✨ Cari Kart Oluştur", type="primary", use_container_width=True)
 
 with col2:
@@ -344,18 +384,22 @@ with col2:
                     data = hesapla_genel_bakiye(data)
                     components.html(generate_html(data), height=1100, scrolling=True)
                 except Exception as e: st.error(f"Hata: {str(e)}")
+                
         elif uploaded_file:
-            with st.spinner("🤖 Yapay Zeka Okuyor..."):
+            with st.spinner("🤖 Yapay Zeka HTML Dosyasını Okuyor..."):
                 try:
-                    img = Image.open(uploaded_file)
+                    # HTML dosyasını metin olarak oku
+                    html_content = uploaded_file.getvalue().decode("utf-8")
+                    
+                    # Gemini modeli ayarları (Görsel okuma yerine artık doğrudan metin tabanlı çalışıyor)
                     model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"temperature": 0.0})
                     prompt = """
-                    Botanik eczane dökümünü incele ve JSON döndür. 
+                    Ekteki HTML formatındaki eczane/hasta dökümünü detaylıca incele ve istenen JSON formatında veriyi döndür. 
                     ÖNEMLİ KURALLAR:
-                    1. Her reçetenin başında yazan HASTA ADINI mutlaka ayrı yakala.
-                    2. Her ilaç için ADET ve FİYAT bilgilerini çek. "ad" kısmına SADECE ilacın ismini yaz (fiyat ve adet rakamlarını isme KESİNLİKLE dahil etme).
-                    3. Reçeteler için HESAPLAR satırındaki tutarları ayıkla.
-                    4. genel_bakiye'yi 0.00 bırak, sistem kendi hesaplayacak.
+                    1. HTML içindeki ana hasta adını, reçete girişlerini, ilaç adlarını, fiyat ve adetlerini ayıkla.
+                    2. İlaç "ad" alanına SADECE ilacın ismini yaz (fiyat ve adet rakamlarını KESİNLİKLE isme dahil etme).
+                    3. Tabloda hastanın yaptığı "Nakit Tahsilat", "Kredi Kartı", "POS" gibi ÖDEMELER varsa bunları ayıklayıp "tahsilatlar" listesine ekle.
+                    4. genel_bakiye'yi 0.00 bırak, sistem kendi matematik formülüyle hesaplayacak.
                     
                     JSON ŞEMASI:
                     {
@@ -364,7 +408,7 @@ with col2:
                         {
                           "tarih": "GG.AA.YYYY",
                           "hasta_adi_ozel": "Bu Reçetedeki İsim",
-                          "kod": "Reçete Kodu",
+                          "kod": "İşlem Türü veya Reçete Kodu",
                           "ilaclar": [
                             {"ad": "SADECE İlaç Adı", "adet": "1", "fiyat": "0.00", "fiyat_farki": "0.00"}
                           ],
@@ -375,11 +419,25 @@ with col2:
                           "yansiyan": "0.00"
                         }
                       ],
+                      "tahsilatlar": [
+                        {
+                          "tarih": "GG.AA.YYYY",
+                          "tur": "Nakit Tahsilat vb.",
+                          "tutar": "0.00"
+                        }
+                      ],
                       "genel_bakiye": "0.00"
                     }
                     """
-                    response = model.generate_content([prompt, img])
-                    data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group(0))
+                    response = model.generate_content([prompt, html_content])
+                    
+                    # JSON'u yanıttan ayıkla
+                    json_str = re.search(r'\{.*\}', response.text, re.DOTALL).group(0)
+                    data = json.loads(json_str)
+                    
+                    # Genel bakiyeyi hesapla ve ekrana bas
                     data = hesapla_genel_bakiye(data)
                     components.html(generate_html(data), height=1100, scrolling=True)
-                except Exception as e: st.error(f"Hata: {str(e)}")
+                except Exception as e: st.error(f"Yapay Zeka Okuma Hatası: {str(e)}")
+
+```
