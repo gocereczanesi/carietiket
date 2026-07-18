@@ -1,10 +1,3 @@
-Anladım abi, çok mantıklı. Metin yapıştırma kısmına (`parse_botanik_text`) hiç dokunmuyoruz, o eskisi gibi çalışmaya devam edecek.
-
-İkinci sekmeyi **"Görsel Yükle"** yerine **"🌐 HTML Dosyası Yükle"** olarak değiştirdim. Artık sisteme o detaylı hasta tablosunu içeren `.html` dosyasını yüklediğinde, yapay zeka (Gemini) HTML kodunu okuyup içindeki hem reçeteleri hem de **tahsilatları (ödemeleri)** ayrıştıracak ve eksiksiz bir Cari Kart dökümü oluşturacak.
-
-Ayrıca önceki mesajda bahsettiğim "Ödeme Düşme" (tahsilat) mantığını da döküme ve genel bakiye matematiğine entegre ettim. İşte **Carikart v1.3**'ün tam ve güncel kodu:
-
-```python
 import streamlit as st
 import streamlit.components.v1 as components
 import google.generativeai as genai
@@ -439,5 +432,3 @@ with col2:
                     data = hesapla_genel_bakiye(data)
                     components.html(generate_html(data), height=1100, scrolling=True)
                 except Exception as e: st.error(f"Yapay Zeka Okuma Hatası: {str(e)}")
-
-```
