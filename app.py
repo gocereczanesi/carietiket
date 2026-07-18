@@ -23,35 +23,37 @@ except:
     st.error("⚠️ Sistem Hatası: Lütfen Streamlit 'Secrets' bölümüne API anahtarınızı ekleyin.")
     st.stop()
 
-# --- MATEMATİKSEL TOPLAMA FONKSİYONU (GÜNCELLENDİ: TAHSİLATLAR EKLENDİ) ---
+# --- MATEMATİKSEL TOPLAMA FONKSİYONU (GÜNCELLENDİ: NOKTA/VİRGÜL HATASI ÇÖZÜLDÜ) ---
 def hesapla_genel_bakiye(data):
     toplam_borc = 0.0
     toplam_odeme = 0.0
     
+    # Akıllı Float Çevirici
+    def cevir_float(val_str):
+        val_str = str(val_str).strip()
+        # Eğer virgül varsa Türkçe formattır (Örn: 9.197,63 veya 9197,63)
+        if ',' in val_str:
+            val_str = val_str.replace('.', '').replace(',', '.')
+        # Virgül yoksa zaten yapay zekanın 9197.63 formatıdır, float() bunu doğrudan anlar
+        try:
+            return float(val_str)
+        except:
+            return 0.0
+
     # Reçetelerden gelen borçları topla
     for r in data.get('receteler', []):
-        yans_str = str(r.get('yansiyan', '0,00'))
-        try:
-            val = float(yans_str.replace('.', '').replace(',', '.'))
-            toplam_borc += val
-        except:
-            pass
+        toplam_borc += cevir_float(r.get('yansiyan', '0,00'))
             
     # Tahsilatları (ödemeleri) topla
     for t in data.get('tahsilatlar', []):
-        tutar_str = str(t.get('tutar', '0,00'))
-        try:
-            val = float(tutar_str.replace('.', '').replace(',', '.'))
-            toplam_odeme += val
-        except:
-            pass
+        toplam_odeme += cevir_float(t.get('tutar', '0,00'))
 
     # Net bakiyeyi hesapla (Borç - Ödenen)
     net_bakiye = toplam_borc - toplam_odeme
     
     parts = f"{net_bakiye:.2f}".split('.')
     tam_kisim = parts[0]
-    ondalik_kisim = parts[1]
+    ondalik_kisim = parts[1] if len(parts) > 1 else "00"
     
     tam_kisim_fmt = ""
     is_negative = tam_kisim.startswith('-')
